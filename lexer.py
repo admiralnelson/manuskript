@@ -16,6 +16,11 @@ def lex(characters, token_exprs):
             if match:
                 text = match.group(0)
                 if tag:
+                    if tag == "NUMERIC":
+                        reg = re.compile(r'\d+\.\d*')
+                        isFixed = reg.match(text)
+                        if isFixed: tag = "FIXED"
+                        else: tag = "INTEGER"
                     token = (text, tag)
                     tokens.append(token)
                 break

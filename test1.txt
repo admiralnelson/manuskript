@@ -1,26 +1,3 @@
-procedure 
-diplomacy_start_war_between_kingdoms (kingdomA: Faction, kingdomB: Faction, initializing_war_peace_cond: Integer) 
-{
-    ProcedureCall
-    (script_npc_decision_checklist_peace_or_war(kingdomA, kingdomB, -1))
-    explainer_string 
-    : String = reg1
-    if 
-    (initializing_war_peace_cond <= 2)
-    {
-
-    }
-    else
-    {
-
-    }
-
-    for(cur_relation = kingdomA to kingdomB)
-    {
-        if(cur_relation != kingdomA and cur_relation != kingdomB)
-        {
-
-        }
-    }
-
+procedure myScript(KingdomA: Faction, KingdomB: Faction) { 
+	KingdomA = 1
 }

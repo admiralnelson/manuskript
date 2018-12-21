@@ -38,3 +38,36 @@ paran3 = add paran2 1
 paran4 = reg1
 result = add paran3 paran4
 reg1 = result
+
+
+procedure 
+diplomacy_start_war_between_kingdoms (kingdomA: Faction, kingdomB: Faction, initializing_war_peace_cond: Integer) 
+{
+    ProcedureCall
+    (script_npc_decision_checklist_peace_or_war(kingdomA, kingdomB, -1))
+    explainer_string : String = reg1
+    if 
+    (initializing_war_peace_cond <= 2)
+    {
+
+    }
+    else
+    {
+
+    }
+
+    for(cur_relation = kingdomA to kingdomB)
+    {
+        if(cur_relation != kingdomA and cur_relation != kingdomB)
+        {
+
+        }
+    }
+
+}
+
+
+procedure myScript() { 
+	reg1 = -(1 + 2 + 3 *(1+2+3+4 * -(reg2 * reg2) * reg1)) + (reg1)
+	var = var + 1
+}

@@ -1,0 +1,97 @@
+Meaning 			 	        W3C
+0 or more occurrences of A 		(A)*
+Optional A				        (A)?
+
+script = (chunk)*
+
+chunk = (procedure)*
+
+Procedure = "procedure" ProcedureName "(" Variables ")" Block
+ProcedureTrip = "cf_procedure" ProcedureName "(" Variables ")" Block
+Variables = ValidName ("," ValidName)*
+Literals = "0-9"("0-9")*
+Identifier = ValidName ("." ValidName)* | Literals | ProcedureCall | Expression
+Assignment = "ValidName" "=" Identifier 
+NewAssignment = "ValidName" ":" Type ("=" Identifier)?
+ValidName = "a..z"("0-9")*("a-z")* ("[" Expression "]")? : Type
+ProcedureName = "a..z"("0-9")*("a-z")*
+Type = "String" | "Agents" |  "Troop" | "Scene" | "GameMenu" | "Presentation" | "Party" | "Item" | "Integer" | "FixedPoint" | "Position" | "Faction"
+Block = "{" (Statements)* "}"
+ExpressionLoop = NewAssignment "to" Identifier  | Expression
+ExpressionForEach = NewAssignment "in" Type 
+Statements = ProcedureCall |
+		(Block)* |
+        NewAssignment |
+        Assignment |
+        "return" (Identifier)? |
+        "ExitProcedure" | <- procedure must be cf_
+        "for" ExpressionLoop Block  |
+		"foreach" ExpressionForEach Block |
+		"if" Expression Block 
+		("else if" Expression Block)*
+		("else" Block)?
+		
+
+ProcedureCall = ProcedureName "()" | ProcedureName "(" (Variables) ")"
+
+===Example===
+
+procedure diplomacy_start_war_between_kingdoms (kingdomA: Faction, kingdomB: Faction, initializing_war_peace_cond: Integer) 
+{
+    ProcedureCall(script_npc_decision_checklist_peace_or_war(kingdomA, kingdomB, -1))
+    explainer_string : String = reg1
+    if (initializing_war_peace_cond <= 2)
+    {
+
+    }
+    else
+    {
+
+    }
+
+    for(cur_relation : Faction = kingdomA to kingdomB)
+    {
+        if(cur_relation != kingdomA && cur_relation != kingdomB)
+        {
+
+        }
+    }
+
+}
+
+====UNIT test
+#assignment
+i : Integer = 0
+
+#ifs
+if(1 < 0)
+{
+
+}
+else if (i != 0)
+{
+
+}
+else
+{
+
+}
+
+#loop
+#for loop
+for(i : Integer = 0 to 1 )
+{
+
+}
+
+#while loop
+for(i != 0)
+{
+
+}
+
+#foreach
+foreach(agent : Agent in game.Agents)
+{
+    
+}

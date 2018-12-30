@@ -1,0 +1,92 @@
+chunk : (statement (";")?)* (laststatement (";")?)?
+
+block : chunk
+
+statement :  variablelist "=" expressionlist 
+  | functioncall 
+  | "do" block "end" 
+  | "while" expression "do" block "end" 
+  | "repeat" block "until" expression 
+  | "if" expression "then" block  ("elseif" expression "then" block)* ("else" block)? "end" 
+  | "for" NAME "=" expression "," expression ("," expression)?  "do" block "end" 
+  | "for" namelist "in" expressionlist  "do" block "end" 
+  | "function" functionname functionbody 
+  | "local" "function" NAME functionbody 
+  | "local" namelist ("=" expressionlist)?
+
+laststatement : "return" (expressionlist)? | "break"
+
+functionname : NAME ("." NAME)* (":" NAME)?
+
+variablelist : variable ("," variable)*
+
+variable :  NAME 
+  | prefixexpression "[" expression "]" 
+  | prefixexpression "." NAME
+
+namelist : NAME ("," NAME)*
+
+expressionlist : (expression ",")* expression
+
+expression :  "nil" 
+ | "false" 
+ | "true" 
+ | NUMBER 
+ | string 
+ | "..." 
+ | function 
+ | prefixexpression 
+ | tableconstructor 
+ | expression binaryoperator expression 
+ | unaryoperator expression
+
+string : NAME
+
+prefixexpression : variable 
+ |  functioncall 
+ | "(" expression ")"
+
+functioncall : prefixexpression arguments 
+|  prefixexpression ":" NAME arguments
+
+arguments :  "(" (expressionlist)? ")" 
+|  tableconstructor 
+| string
+
+function : "function" functionbody
+
+functionbody : "(" (parameterlist)? ")" block "end"
+
+parameterlist : namelist ("," "...")? 
+| "..."
+
+tableconstructor : "{" (fieldlist)? "}"
+
+fieldlist : field (fieldseparator field)* (fieldseparator)?
+
+field : "[" expression "]" "=" expression 
+|  NAME "=" expression 
+| expression
+
+fieldseparator : "," 
+| ";"
+
+binaryoperator : "+" 
+| "-" 
+| "*" 
+| "/" 
+| "^" 
+| "%" 
+| ".." 
+| "<" 
+| "<=" 
+| ">" 
+| ">=" 
+|  "==" 
+| "~=" 
+|  "and" 
+| "or"
+
+unaryoperator : "-" 
+| "not" 
+| "#"

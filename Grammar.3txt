@@ -1,0 +1,73 @@
+start: procedure+
+
+procedure: "procedure" NAME paramsdeclare codeblock
+
+variabledeclare: NAME ":" TYPE
+variable : NAME
+
+paramsdeclare : "("")"
+				| "(" variabledeclare ")"
+		        | "(" variabledeclare ("," variabledeclare)+ ")"
+
+codeblock : "{" instruction* "}"
+
+instruction: expression?
+			| assignment?
+			| variabledeclare?
+
+assignment: variable "=" expression
+			
+expression: mathexpression
+		  | boolexpression
+		  | procedureexprssion
+
+	mathexpression: sum 
+      
+		?sum: product
+			| sum "+" product
+			| sum "-" product
+
+		?product: atom
+			| product "*" atom
+			| product "/" atom
+
+		?atom: NUMBER         
+			 | "-" atom       
+			 | variablename   
+			 | array		  
+			 | "(" sum ")"
+    
+	boolexpression: boolsum
+		
+		?boolsum: boolproduct
+			| boolsum "<" boolproduct 
+			| boolsum ">" boolproduct 
+			| boolsum "==" boolproduct
+			| boolsum "=<" boolproduct
+			| boolsum "=>" boolproduct
+			| boolsum "=!" boolproduct
+			| boolsum "||" boolproduct
+			
+		?boolproduct: boolatom
+			| boolproduct "&&" boolatom
+
+		?boolatom: BOOL		
+			| sum			
+			| "!" atom		
+			| variablename  
+			| array			
+			| "(" boolsum ")"
+
+	procedureexprssion: variablename params
+
+		params:  "("")" 
+			| "(" variablename ")" 
+			| "(" variablename ("," variablename)+ ")" 
+			| "(" expression ")" 
+			| "(" expression ("," expression)+ ")" 
+		
+
+
+NAME: /[A-Za-z][A-Za-z0-9_]*/
+NUMBER: /\d+\.?\d*/
+TYPE: "Integer" | "String"

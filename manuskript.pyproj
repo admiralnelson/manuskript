@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{52ce728d-3c20-4918-acdb-8d0da7f78fd6}</ProjectGuid>
     <ProjectHome />
-    <StartupFile>main.py</StartupFile>
+    <StartupFile>test.py</StartupFile>
     <SearchPath />
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -19,6 +19,9 @@
     <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="Grammar.3txt" />
+    <Content Include="Grammar.txt" />
+    <Content Include="grammar2.txt" />
     <Content Include="rules.txt" />
     <Content Include="test.txt" />
     <Content Include="test1.txt" />
@@ -26,6 +29,9 @@
   <ItemGroup>
     <Compile Include="lexer.py" />
     <Compile Include="main.py" />
+    <Compile Include="test.py">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <InterpreterReference Include="Global|PythonCore|2.7" />

@@ -1,4 +1,7 @@
+import sys
 import lexer
+sys.path.append("libs/lark")
+import lark
 
 RESERVED = 'RESERVED'
 LPARANTHESE = "LPARANTHESE"

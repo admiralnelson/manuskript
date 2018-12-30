@@ -95,3 +95,81 @@ foreach(agent : Agent in game.Agents)
 {
     
 }
+
+start: procedure+
+
+procedure: "procedure" procedurename paramsdeclare codeblock -> procedure
+codeblock : "{" "}"
+          | "{" instruction+  "}"
+instruction: assignment | expression | variabledeclare | variable
+
+variabledeclareassign : NAME ":" TYPE ("=" expression) 
+variabledeclare: NAME ":" TYPE 
+variable : array | NAME  -> variable
+?procedurename: NAME
+
+paramsdeclare : "("")"  
+				| "(" NAME ":" TYPE ")" 
+		        | "(" NAME ":" TYPE ("," NAME ":" TYPE)+ ")" 
+
+
+
+
+
+array: variable "[" mathexpression "]"  
+
+assignment: (variable "=" expression) -> assignment
+           | (variabledeclare "=" expression ) -> assignment
+			
+expression: mathexpression
+		  | boolexpression
+		  | procedureexprssion
+
+	?mathexpression: sum 
+      
+		?sum: product
+			| sum "+" product -> op_add
+			| sum "-" product -> op_sub
+
+		?product: atom
+			| product "*" atom -> op_mul
+			| product "/" atom -> op_div
+
+		?atom: NUMBER         -> number
+			 | "-" atom       -> minus
+			 | "(" sum ")"
+    
+	?boolexpression: boolsum
+		
+		?boolsum: boolproduct
+			| boolsum "<" boolproduct -> lt
+			| boolsum ">" boolproduct  -> gt
+			| boolsum "==" boolproduct -> eq
+			| boolsum "=<" boolproduct -> le
+			| boolsum "=>" boolproduct -> ge
+			| boolsum "=!" boolproduct -> neq
+			| boolsum "||" boolproduct -> or
+			
+		?boolproduct: boolatom
+			| boolproduct "&&" boolatom -> and
+
+		?boolatom: BOOL		
+			| "!" boolatom		
+			| "(" boolsum ")"
+
+	?procedureexprssion: variable params
+
+		?params:  "("")" 
+			| "(" variable ")" 
+			| "(" variable ("," variable)+ ")" 
+			| "(" expression ")" 
+			| "(" expression ("," expression)+ ")" 
+		
+
+
+NAME: /[A-Za-z][A-Za-z0-9_]*/
+NUMBER: /\d+\.?\d*/
+TYPE: "Number" | "String" | "QString" | "Procedure"
+    | "Faction" | "Presentation" | "Troop" | "Agent" | "Item"
+BOOL: "true"
+	| "false"

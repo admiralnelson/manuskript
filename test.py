@@ -20,6 +20,8 @@ reservedKeywords = [
         "false",
         "die",
         "return",
+        "bgroup"
+        "paren"
     ]
 
 def isNumber(s):
@@ -140,8 +142,16 @@ class CalculateTree(Transformer):
         self.parentsLevel += 1
         args1 = str(args1)
         args2 = str(args2)
+        if(args1 == "true") : args1 = 1
+        elif(args1 == "false") : args1 = 0
+        else: args1 = args1
+        if(args2 == "true") : args2 = 1
+        elif(args2 == "false") : args2 = 0
+        else: args2 =  args2
+        if(":bgroup" not in args2): args2 = "\":" + args2 + "\""
+        if(":bgroup" not in args1): args1 = "\":" + args1 + "\""
         self.output += "\t"*self.blockLevel*2 +  "# ---- boolean: "+ args1 +" or "+ args2  +"\n"
-        self.output += "\t"*(self.blockLevel*2) +  "(store_or,\""+ self.mathVars[-1]  +"\" ,\""+ args1  +"\",\"" + args2 +"\"),\n"
+        self.output += "\t"*(self.blockLevel*2) +  "(store_or,\""+ self.mathVars[-1]  +"\" ,"+ args1  +", " + args2 +"),\n"
 
     def op_and(self, args1, args2 = None):
         args1 = str(args1)
@@ -589,7 +599,7 @@ def test():
     
     tree = parser.parse(text)
     print(tree.pretty())
-    print(str(procedures[1]))
+    print(str(procedures[0]))
     #pydot__tree_to_png(tree, "output.png")
 
 if __name__ == '__main__':

@@ -140,18 +140,18 @@ class CalculateTree(Transformer):
             args1 = "\"" + self.mathVars[-1] +  "\""
         self.mathVars.append(":bgroup" + str(self.parentsLevel))
         self.parentsLevel += 1
-        args1 = str(args1)
-        args2 = str(args2)
-        if(args1 == "true") : args1 = 1
-        elif(args1 == "false") : args1 = 0
-        else: args1 = args1
-        if(args2 == "true") : args2 = 1
-        elif(args2 == "false") : args2 = 0
-        else: args2 =  args2
-        if(":bgroup" not in args2): args2 = "\":" + args2 + "\""
-        if(":bgroup" not in args1): args1 = "\":" + args1 + "\""
+        if(str(args1) == "true") : args1 = 1
+        elif(str(args2)== "false") : args1 = 0
+        if(str(args1) == "true") : args2 = 1
+        elif(str(args2) == "false") : args2 = 0
+        if(":bgroup" not in str(args2)): args2 = "\":" + args2 + "\""
+        if(":bgroup" not in str(args1)): args1 = "\":" + args1 + "\""
+        if(":bgroup" in str(args1) and ":bgroup" in str(args1)):
+            if(str(args1)==str(args2)): 
+                args1 ="\"" + self.mathVars[-2] + "\""
+                args2 = "\"" +self.mathVars[-3] + "\""
         self.output += "\t"*self.blockLevel*2 +  "# ---- boolean: "+ args1 +" or "+ args2  +"\n"
-        self.output += "\t"*(self.blockLevel*2) +  "(store_or,\""+ self.mathVars[-1]  +"\" ,"+ args1  +", " + args2 +"),\n"
+        self.output += "\t"*(self.blockLevel*2) +  "(store_or,\""+ self.mathVars[-1]  +"\", "+ args1  +", " + args2 +"),\n"
 
     def op_and(self, args1, args2 = None):
         args1 = str(args1)
@@ -433,15 +433,15 @@ block: beginblock  (instruction)* endblock
 	?boolexpression: boolsum
 
         ?boolsum: boolcomp
-            | boolsum "||" boolcomp -> op_or
+            | [ boolsum "||" ] boolproduct -> op_or
 		
 		?boolcomp: boolproduct
-			| boolcomp "<" boolproduct -> op_lt
-			| boolcomp ">" boolproduct  -> op_gt
-			| boolcomp "==" boolproduct -> op_eq
-			| boolcomp "=<" boolproduct -> op_le
-			| boolcomp "=>" boolproduct -> op_ge
-			| boolcomp "=!" boolproduct -> op_neq
+			|  boolcomp "<"  boolproduct -> op_lt
+			|  boolcomp ">"  boolproduct  -> op_gt
+			|  boolcomp "==" boolproduct -> op_eq
+			|  boolcomp "=<" boolproduct -> op_le
+			|  boolcomp "=>" boolproduct -> op_ge
+			|  boolcomp "=!"  boolproduct -> op_neq
 			
 			
 		?boolproduct: boolatom
@@ -507,15 +507,20 @@ def test():
     text = """
        procedure OpFaggot(faggottryPoints : Number)
        {
-            bool1: Boolean; bool2: Boolean; bool3: Boolean;
-            bool4: Boolean;
+            bool1: Boolean; bool2: Boolean; bool3: Boolean; bool4: Boolean;
+            
             if(bool1 || bool2)
             {
                 faggottryPoints = 0;
             }
-            if(bool1 || bool2 || bool3 || bool3)
+            if(bool1 || bool2 || bool3 || bool3 && true)
             {
                 faggottryPoints = 0;
+            }
+
+            if(bool1 || bool2 || bool3 || (bool4 && true) || bool2)
+            {
+                faggottryPoints = 1*2 + 1;
             }
 
        }

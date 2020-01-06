@@ -70,6 +70,7 @@ class CalculateTree(Transformer):
         self.neg = False
         self.enteredIfForIndent = False
         self.currentProcedureName = ""
+        self.proceduresName = []
     #def procedure(self, *args):
         #print "procedure " + str(args)
 
@@ -296,8 +297,10 @@ class CalculateTree(Transformer):
 
        # raise Exception("!")
     ################################################  BOOLEAN OPERATIONS END
+    def result(self, *args):
+        self.output += str(args)
+
     def expression(self, arg1=None):
-        
         if(arg1 == None):
             arg1 = self.mathVars[-1]
         else:
@@ -445,8 +448,7 @@ class CalculateTree(Transformer):
         self.output +=  "\t"*self.blockLevel + "(eq, 0, 1)"
 
     def procedure(self, *args):
-        self.currentProcedureName = str(args[0])
-        proc = "(\"" + str(args[0]) + "\",[\n"
+        proc = "(\"" + self.currentProcedureName  + "\",[\n"
         proc += self.output 
         proc += "]),"
         procedures.append(proc)
@@ -455,8 +457,23 @@ class CalculateTree(Transformer):
         del self.paramsdeclares[:] # clear every procedure
         del self.vars[:] # clear every procedure
         print("# procedure" + str(args))
+
+    def function(self, *args):
+        proc = "(\"" + self.currentProcedureName  + "\",[\n"
+        proc += self.output 
+        proc += "]),"
+        procedures.append(proc)
+        self.blockLevel  =1 # clear every procedure
+        self.output = "" # clear every procedure
+        del self.paramsdeclares[:] # clear every procedure
+        del self.vars[:] # clear every procedure
+        print("# function" + str(args))
+
     def procedure_name(self, arg1):
-        self.currentProcedureName = str(arg1 )
+        self.currentProcedureName = str(arg1)
+        if(self.currentProcedureName in self.proceduresName):
+            raise Exception("COMPILER ERROR: redefinition of procedure/function " + self.currentProcedureName + " (it is already exist)")
+        self.proceduresName.append(self.currentProcedureName)
 
     def isValidVariable(self, var):
         var = str(var)
@@ -481,8 +498,9 @@ turtle_grammar = """
 start: (procedure | function)+ 
 
 ?procedure: "procedure" procedurename paramsdeclare  mainblock
-exitprocedure: "die"
 ?function: "function" procedurename paramsdeclare ":" returnsdeclare  mainblock
+
+exitprocedure: "die"
 
 ?procedurename: NAME -> procedure_name
 
@@ -490,7 +508,8 @@ paramsdeclare : "("")"
 				| "(" NAME ":" TYPE ")" 
 		        | "(" NAME ":" TYPE ("," NAME ":" TYPE)+ ")" 
 
-returnsdeclare  :  "(" TYPE ")" 
+returnsdeclare  : "("")"
+                | "(" TYPE ")" 
 		        | "("  TYPE (","  TYPE)+ ")" 
 
 
@@ -515,7 +534,9 @@ try_else_body: else_try (instruction)*
 ?instruction: assignment ";"
             | variabledeclare ";"
             | exitprocedure ";"
+            | result ";"
             | ifstatement
+            
 
 ?expression :  bool_or
         ?bool_or: bool_and 
@@ -551,7 +572,8 @@ try_else_body: else_try (instruction)*
 			| "(" expression ")" 
 			| "(" expression ("," expression)+ ")" 
 	
-     
+
+?result : "result" expression 
 
 ?assignment: variable "=" expression
            | variabledeclare "=" expression 
@@ -620,14 +642,20 @@ def test():
                 RelationFacB = -(9999 + -100);
             end
        end
-
+       function Factorial(Input: Number) : (Number)
+       begin
+            if(Input > 0) then
+                result -100;
+            end
+            result 0;
+       end
 
        
     """
     
     tree = parser.parse(text)
     print(tree.pretty())
-    print(str(procedures[0]))
+    print(str(procedures[1]))
     #pydot__tree_to_png(tree, "output.png")
 
 if __name__ == '__main__':

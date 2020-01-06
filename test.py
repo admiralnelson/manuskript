@@ -24,9 +24,7 @@ reservedKeywords = [
         "paren"
     ]
 
-IF_STATE = 0
-ELSEIF_STATE =1 
-ELSE_STATE = 2
+DEBUG = False
 
 def isNumber(s):
     try:
@@ -57,8 +55,7 @@ class CalculateTree(Transformer):
     def __init__(self):
         self.mathVars = [] # clear every assigment or expression check
         self.parentsLevel = 1 # clear every assigment  or expression check
-
-        self.flag_if = IF_STATE
+        self.else_if_counter = 0
 
         self.vars = [] 
         self.literals = []
@@ -144,7 +141,7 @@ class CalculateTree(Transformer):
         if(isBooleanLiteral(args1) and isBooleanLiteral(args2)):
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
-            self.output += "\t"*self.blockLevel +  "# ---- boolean1: "+ args1 +" or "+ args2  +"\n"
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean1: "+ args1 +" or "+ args2  +"\n")
             a = 0
             b = 0
             if(args1 == "true"): a = 1
@@ -153,25 +150,30 @@ class CalculateTree(Transformer):
         elif(args1 == None and isBooleanLiteral(args2)):
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
-            self.output += "\t"*self.blockLevel +  "# ---- boolean2: "+ self.mathVars[-2] +" or "+ args2  +"\n"
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean2: "+ self.mathVars[-2] +" or "+ args2  +"\n")
             b = 0
             if(args2 == "true"): b = 1
             self.output += "\t"*(self.blockLevel) +  "(store_or,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\"," + str(b) +"),\n"
         elif(args1 == None):
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
-            self.output += "\t"*self.blockLevel +  "# ---- boolean4 : "+ self.mathVars[-2] +" or "+ self.mathVars[0] +"\n"
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean4 : "+ self.mathVars[-2] +" or "+ self.mathVars[0] +"\n")
             b = 0
             if(args2 == "true"): b = 1
             self.output += "\t"*(self.blockLevel) +  "(store_or,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + self.mathVars[0]  +"\"),\n"            
-            
+        elif(args1 != None and args2 == None):
+            self.mathVars.append(":bgroup" + str(self.parentsLevel))
+            self.parentsLevel += 1
+            args2 =  self.mathVars[-2] 
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean5: \":"+ args1 +"\" or \""+ str(args2)  +"\" \n")
+            self.output += "\t"*(self.blockLevel) +  "(store_or, \""+ self.mathVars[-1]  +"\", \":" + args1 + "\", \"" + args2  +"\" ),\n"
         else:
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
             if(args2 == "true"): args2 = 1
             elif(args2 == "false"): args2 = 0
             else: args2 = "\":"+ args2 + "\""
-            self.output += "\t"*self.blockLevel +  "# ---- boolean3: \":"+ args1 +"\" or "+ str(args2)  +"\n"
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean3: \":"+ args1 +"\" or "+ str(args2)  +"\n")
             self.output += "\t"*(self.blockLevel) +  "(store_or, \""+ self.mathVars[-1]  +"\", \":"+ args1  +"\", " + str(args2) +"),\n"
         #print str(args1) + " second args " + str(args2)
 
@@ -181,7 +183,7 @@ class CalculateTree(Transformer):
         if(isBooleanLiteral(args1) and isBooleanLiteral(args2)):
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
-            self.output += "\t"*self.blockLevel +  "# ---- boolean1: "+ args1 +" and "+ args2  +"\n"
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean1: "+ args1 +" and "+ args2  +"\n")
             a = 0
             b = 0
             if(args1 == "true"): a = 1
@@ -190,33 +192,38 @@ class CalculateTree(Transformer):
         elif(args1 == None and isBooleanLiteral(args2)):
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
-            self.output += "\t"*self.blockLevel +  "# ---- boolean2: "+ self.mathVars[-2] +" and "+ args2  +"\n"
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean2: "+ self.mathVars[-2] +" and "+ args2  +"\n")
             b = 0
             if(args2 == "true"): b = 1
             self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\"," + str(b) +"),\n"
         elif(args1 == None):
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
-            self.output += "\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-3] +"\n"
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-3] +"\n")
             b = 0
             if(args2 == "true"): b = 1
             self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + self.mathVars[-3]  +"\"),\n"
-            
-            
+        elif(args1 != None and args2 == None):
+            self.mathVars.append(":bgroup" + str(self.parentsLevel))
+            self.parentsLevel += 1
+            args2 =  self.mathVars[-2] 
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean5: \":"+ args1 +"\" and \""+ str(args2)  +"\" \n")
+            self.output += "\t"*(self.blockLevel) +  "(store_and, \""+ self.mathVars[-1]  +"\", \":" + args1 + "\", \"" + args2  +"\" ),\n"
+        
         else:
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
             if(args2 == "true"): args2 = 1
             elif(args2 == "false"): args2 = 0
             else: args2 = "\":"+ args2 + "\""
-            self.output += "\t"*self.blockLevel +  "# ---- boolean3: \""+ args1 +"\" and "+ str(args2)  +"\n"
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean3: \""+ args1 +"\" and "+ str(args2)  +"\n")
             self.output += "\t"*(self.blockLevel) +  "(store_and, \""+ self.mathVars[-1]  +"\", \":"+ args1  +"\", " + str(args2) +"),\n"
         #print str(args1) + " second args " + str(args2)
 
     def op_neq(self, arg1, arg2):        
         self.mathVars.append(":bgroup" + str(self.parentsLevel))
         self.parentsLevel += 1
-        self.output += "\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" neq "+ str(arg2) +"\n"
+        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" neq "+ str(arg2) +"\n")
         self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
         self.output += "\t"*self.blockLevel +  "(try_begin),\n"
         self.output += "\t"*((self.blockLevel)+1) +  "(neq," 
@@ -228,7 +235,7 @@ class CalculateTree(Transformer):
         self.output += "),\n"
         self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
         self.output += "\t"*self.blockLevel +  "(try_end),\n"
-        self.output += "\t"*self.blockLevel +  "# ---- end ---\n"
+        self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
           
         #raise Exception("OK")
     def op_neg(self, arg1):
@@ -236,7 +243,7 @@ class CalculateTree(Transformer):
             args2 = "\"" + self.mathVars[-1] +  "\""
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
-            self.output += "\t"*self.blockLevel +  "# ---- negation: "+ self.mathVars[-2]  +"\n"
+            self.append_comment("\t"*self.blockLevel +  "# ---- negation1: "+ self.mathVars[-2]  +"\n")
             self.output += "\t"*(self.blockLevel) +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
             self.output += "\t"*self.blockLevel +  "(try_begin),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(eq, \"" +  self.mathVars[-2] + "\", 1),\n"
@@ -252,7 +259,7 @@ class CalculateTree(Transformer):
             else: arg1 = "\":" + arg1 + "\""
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
-            self.output += "\t"*self.blockLevel +  "# ---- negation: "+  str(arg1)   +"\n"
+            self.append_comment("\t"*self.blockLevel +  "# ---- negation2: "+  str(arg1)   +"\n")
             self.output += "\t"*(self.blockLevel) +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
             self.output += "\t"*self.blockLevel +  "(try_begin),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(eq, " +  str(arg1) + ", 1),\n"
@@ -310,10 +317,10 @@ class CalculateTree(Transformer):
             else:
                 if(variable=="Boolean"):
                     if str(arg2) == "true":
-                        self.output +=  "\t"*self.blockLevel+  "# "+ str(arg1) + " := true (1) " + "\n" 
+                        self.append_comment("\t"*self.blockLevel+  "# "+ str(arg1) + " := true (1) " + "\n")
                         arg2 = 1
                     elif str(arg2) == "false":
-                        self.output +=  "\t"*self.blockLevel+  "# "+ str(arg1) + " := false (0) " + "\n" 
+                        self.append_comment("\t"*self.blockLevel+  "# "+ str(arg1) + " := false (0) " + "\n")
                         arg2 = 0
                     else: 
                         raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: boolean true or false ")
@@ -338,18 +345,18 @@ class CalculateTree(Transformer):
         if( ":" + arg1 in vars or "$" + arg1 in vars ):
             raise Exception("COMPILER ERROR: " + arg1 + " is already defined!")
 
-        self.output +=  "\t"*self.blockLevel+  "# var declare: "+ str(arg1) + " type :" + str(arg2)  + "\n"
-        self.output +=  "\t"*self.blockLevel+ "(assign, \":" + str(arg1) + "\", 0),\n\n" 
+        self.append_comment("\t"*self.blockLevel+  "# var declare: "+ str(arg1) + " type :" + str(arg2)  + "\n")
+        self.output +=  "\t"*self.blockLevel+ "(assign, \":" + str(arg1) + "\", 0),\n" 
         self.vars.append(( ":" + str(arg1), str(arg2)))
 
     def variabledeclareparams(self, arg1, arg2):
         if(arg1 in reservedKeywords):
             raise Exception("COMPILER ERROR: " + arg1 + " is reserved keyword!")
-        self.output +=  "\t"*self.blockLevel+  "# var declare: "+ str(arg1) + " type :" + str(arg2)  + "\n" 
+        self.append_comment("\t"*self.blockLevel+  "# var declare: "+ str(arg1) + " type :" + str(arg2)  + "\n" )
         self.vars.append(( ":" + str(arg1), str(arg2)))
 
     def variabledeclareglobal(self, arg1, arg2):
-        self.output +=  "\t"*self.blockLevel + "# var declare: "+ str(arg1) + " type :" + str(arg2) + "\n"
+        self.append_comment("\t"*self.blockLevel + "# var declare: "+ str(arg1) + " type :" + str(arg2) + "\n")
         self.output +=  "\t"*self.blockLevel+ "(assign, \"$" + str(arg1) + "\", 0),\n\n" 
         self.vars.append(( "$" + str(arg1), str(arg2)))
 
@@ -359,61 +366,31 @@ class CalculateTree(Transformer):
         #self.blockLevel += 1
         #print "# block " + str(args)
 
-    def if_block(self, *args):
-        self.flag_if = IF_STATE
-        self.parentsLevel = 1
-        args = str(args[0])
-        print(args)
-        if(args  == "true"):
-            self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, 1,1)"
-        elif(args == "false"):
-            self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, 1,0)"
+    def test_expression(self, arg):
+        if(arg == None and self.else_if_counter == 0):
+            self.blockcondition = "\t"*(self.blockLevel + 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+        elif(arg == None and self.else_if_counter > 0):
+            self.output += "\t"*(self.blockLevel) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
         else:
-            if(len(self.mathVars) ==0 ):self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, \""+ "FUCK" + str(args) + "\", 1)"
-            else:
-                self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, \""+ self.mathVars[-1]  + "\", 1)"
-        self.output =  self.output.replace("@REPLACE", self.blockcondition)
-        self.blockcondition = ""
-        #del self.mathVars[:]
-
-    def elif_block(self, *args):
-        self.flag_if = IF_STATE
-        self.parentsLevel = 1
-        args = str(args[0])
-        print(args)
-        if(args  == "true"):
-            self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, 1,1)"
-        elif(args == "false"):
-            self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, 1,0)"
-        else:
-            if(len(self.mathVars) ==0 ):self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, \""+ "FUCK" + str(args) + "\", 1)"
-            else:
-                self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, \""+ self.mathVars[-1]  + "\", 1)"
-        self.output =  self.output.replace("@REPLACE", self.blockcondition)
-        self.blockcondition = ""
-
-    def else_block(self, *args):
-        self.flag_if = ELSE_STATE
-        self.parentsLevel = 1
-        args = str(args[0])
-        print(args)
-        if(args  == "true"):
-            self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, 1,1)"
-        elif(args == "false"):
-            self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, 1,0)"
-        else:
-            if(len(self.mathVars) ==0 ):self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, \""+ "FUCK" + str(args) + "\", 1)"
-            else:
-                self.blockcondition = "\t"*((self.blockLevel)-2) +  "(neq, \""+ self.mathVars[-1]  + "\", 1)"
-        self.output =  self.output.replace("@REPLACE", self.blockcondition)
-        self.blockcondition = ""
+            if arg == "true":
+                self.output += "\t"*(self.blockLevel) +  "(eq, 1,1), \n"
+            elif arg == "false":
+                self.output += "\t"*(self.blockLevel) +  "(eq, 1,0), \n"
         del self.mathVars[:]
+
+    def else_if_block(self, *args):
+        pass
 
     def beginblock(self, *args):
         self.blockLevel += 1
-        try_begin = "(try_begin)" if self.flag_if == IF_STATE else "(else_try)"
-        self.output +=  "\t"*(self.blockLevel-1)+ try_begin +",\n" + "\t"*(self.blockLevel)+"@REPLACE,\n" 
+        self.output +=  "\t"*(self.blockLevel-1)+ "(try_begin),\n" + self.blockcondition
+        self.blockcondition = ""
         print("begin!")
+
+    def else_try(self, *args):
+        self.else_if_counter += 1
+        self.output +=  "\t"*(self.blockLevel-1)+ "(else_try),\n" 
+        print("else!")
 
     def endblock(self, *args):
         self.blockLevel -= 1
@@ -422,7 +399,7 @@ class CalculateTree(Transformer):
 
 
     def paramsdeclare(self, *args):
-        self.output +=  "\t"*self.blockLevel + "#---parameter declarations begin---\n "
+        self.append_comment("\t"*self.blockLevel + "#---parameter declarations begin---\n ")
         if(len(args)!= 0):
             index = 0
             for i in  range(0, len(args)-1,2):
@@ -434,15 +411,16 @@ class CalculateTree(Transformer):
                 self.output += "\t"*self.blockLevel +  "(store_script_param, \":" +  str(args[i])  + "\", " + str(index)  + "),\n"
         else:
             print("# params declare: " + str(args))
-        self.output +=  "\t"*self.blockLevel + "#---parameter declarations end---\n "
+        self.append_comment("\t"*self.blockLevel + "#---parameter declarations end---\n ")
 
 
     def exitprocedure(self):
         self.output +=  "\t"*self.blockLevel + "(eq, 0, 1)"
 
     def procedure(self, *args):
-        proc = "\t(\"" + str(args[1]) + "\",\n"
-        proc += "\t[\n" + self.output  +"\n\t]"
+        proc = "(\"" + str(args[0]) + "\",[\n"
+        proc += self.output 
+        proc += "]),"
         procedures.append(proc)
         self.blockLevel  =1 # clear every procedure
         self.output = "" # clear every procedure
@@ -450,6 +428,9 @@ class CalculateTree(Transformer):
         del self.vars[:] # clear every procedure
         print("# procedure" + str(args))
 
+    def append_comment(self, text):
+        if(DEBUG):
+            self.output += text
 
 
 
@@ -469,17 +450,21 @@ paramsdeclare : "("")"
 returnsdeclare  :  "(" TYPE ")" 
 		        | "("  TYPE (","  TYPE)+ ")" 
 
-beginblock : "{"
-endblock: "}"
 
-mainblock :          "{""}"  
-				| "{" (instruction)* "}" 
+mainblock :     "begin""end"  
+				| "begin" (instruction)* "end" 
 
-ifstatement:  "if" "(" (expression | BOOL )  ")" block -> if_block
-          | ifstatement ( "elseif" "(" (expression | BOOL )  ")" block )+ -> elif_block
-          | ifstatement ("else" block) -> else_block 
+beginblock: "then"
+endblock: "end"
+else_try: "else" "if"
 
-block: beginblock  (instruction)* endblock
+test : "(" (expression | BOOL ) ")" -> test_expression
+
+ifstatement: if_body endblock 
+            | if_body (try_else_body)+ endblock  -> else_if_block
+if_body: "if" test beginblock (instruction)*
+try_else_body : else_try test "then" (instruction)* 
+
      
 ?instruction: variable ";"
             | assignment ";"
@@ -491,10 +476,10 @@ block: beginblock  (instruction)* endblock
 
 
         ?bool_or: bool_and 
-            | bool_or  "||" bool_and -> op_or
+            | bool_or  "or" bool_and -> op_or
 
         ?bool_and: comp
-            | bool_and  "&&" comp -> op_and
+            | bool_and  "and" comp -> op_and
 
         ?comp: sum
             | comp  "<" sum -> op_gt 
@@ -573,23 +558,21 @@ def main():
 def test():
     text = """
        procedure OpFaggot(faggottryPoints : Number)
-       {
+       begin
             bool1: Boolean; bool2: Boolean; bool3: Boolean; bool4: Boolean;
 
 
-            if((bool1 || bool2) || (true && false) && (1 != 2))
-            {
+            if((bool1 or bool2) or (true and false) and (1 != 2))
+            then
                 faggottryPoints = -1;
-            }
-            elseif(true)
-            {
+            else if(2 != 2) then
                 faggottryPoints = 2;
-            }
-            else
-            {
+            else if(bool1 or false) then
                 faggottryPoints = 3;
-            }
-       }
+            else if(bool2 or true and false) then
+                faggottryPoints = 4;
+            end
+       end
 
 
        

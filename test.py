@@ -376,6 +376,22 @@ class CalculateTree(Transformer):
         self.blockcondition = ""
         #del self.mathVars[:]
 
+    def elif_block(self, *args):
+        self.flag_if = IF_STATE
+        self.parentsLevel = 1
+        args = str(args[0])
+        print(args)
+        if(args  == "true"):
+            self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, 1,1)"
+        elif(args == "false"):
+            self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, 1,0)"
+        else:
+            if(len(self.mathVars) ==0 ):self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, \""+ "FUCK" + str(args) + "\", 1)"
+            else:
+                self.blockcondition = "\t"*((self.blockLevel)-2) +  "(eq, \""+ self.mathVars[-1]  + "\", 1)"
+        self.output =  self.output.replace("@REPLACE", self.blockcondition)
+        self.blockcondition = ""
+
     def else_block(self, *args):
         self.flag_if = ELSE_STATE
         self.parentsLevel = 1
@@ -459,8 +475,12 @@ endblock: "}"
 mainblock :          "{""}"  
 				| "{" (instruction)* "}" 
 
-block: beginblock  (instruction)* endblock
+ifstatement:  "if" "(" (expression | BOOL )  ")" block -> if_block
+          | ifstatement ( "elseif" "(" (expression | BOOL )  ")" block )+ -> elif_block
+          | ifstatement ("else" block) -> else_block 
 
+block: beginblock  (instruction)* endblock
+     
 ?instruction: variable ";"
             | assignment ";"
             | variabledeclare ";"
@@ -514,9 +534,7 @@ block: beginblock  (instruction)* endblock
 //           | variabledeclare "=" STRING 
 //           | variable "=" STRING 
 
-ifstatement:  "if" "(" (expression | BOOL )  ")" block -> if_block
-          | ifstatement ( "else if" "(" (expression | BOOL )  ")" block )+ -> elif_block
-          | ifstatement ("else" block) -> else_block 
+
 
 
 variabledeclareassign : NAME ":" TYPE ("=" expression) 
@@ -562,6 +580,10 @@ def test():
             if((bool1 || bool2) || (true && false) && (1 != 2))
             {
                 faggottryPoints = -1;
+            }
+            elseif(true)
+            {
+                faggottryPoints = 2;
             }
             else
             {

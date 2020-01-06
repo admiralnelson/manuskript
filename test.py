@@ -387,6 +387,11 @@ class CalculateTree(Transformer):
         self.blockcondition = ""
         print("begin!")
 
+    def else_if_try(self, *args):
+        self.else_if_counter += 1
+        self.output +=  "\t"*(self.blockLevel-1)+ "(else_try),\n" 
+        print("else!")
+
     def else_try(self, *args):
         self.else_if_counter += 1
         self.output +=  "\t"*(self.blockLevel-1)+ "(else_try),\n" 
@@ -456,15 +461,16 @@ mainblock :     "begin""end"
 
 beginblock: "then"
 endblock: "end"
-else_try: "else" "if"
+else_if_try: "else" "if"
+else_try: "else"
 
 test : "(" (expression | BOOL ) ")" -> test_expression
 
 ifstatement: if_body endblock 
-            | if_body (try_else_body)+ endblock  -> else_if_block
+            | if_body (try_else_if_body)+ (try_else_body)? endblock  -> else_if_block
 if_body: "if" test beginblock (instruction)*
-try_else_body : else_try test "then" (instruction)* 
-
+try_else_if_body : else_if_try test "then" (instruction)* 
+try_else_body: else_try (instruction)* 
      
 ?instruction: variable ";"
             | assignment ";"
@@ -557,20 +563,25 @@ def main():
 
 def test():
     text = """
-       procedure OpFaggot(faggottryPoints : Number)
+       procedure CalculateFactionTension(RelationFacA : Number, RelationFacB: Number)
        begin
             bool1: Boolean; bool2: Boolean; bool3: Boolean; bool4: Boolean;
 
 
-            if((bool1 or bool2) or (true and false) and (1 != 2))
+            if(
+                (bool1 or bool2) or 
+                (true and false) and (1 != 2))
             then
-                faggottryPoints = -1;
+                RelationFacA = -1 + RelationFacB * (RelationFacA * -100) * 2;
             else if(2 != 2) then
-                faggottryPoints = 2;
+                RelationFacA = -1 + RelationFacB * (RelationFacA / -100) * 2;
             else if(bool1 or false) then
-                faggottryPoints = 3;
+                RelationFacA = -1 + RelationFacB * ( -RelationFacA * -100) * 2;
             else if(bool2 or true and false) then
-                faggottryPoints = 4;
+                RelationFacA = -0 + RelationFacB * (RelationFacA * -100) * 2;
+            else 
+                RelationFacB = -9999;
+                RelationFacB = -(9999 + -100);
             end
        end
 

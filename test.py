@@ -47,6 +47,7 @@ def isVariable(s):
     except ValueError:
         return True
 
+
 procedures = []
 @v_args(inline=True) # Affects the signatures of the methods
 class CalculateTree(Transformer):
@@ -55,7 +56,7 @@ class CalculateTree(Transformer):
     def __init__(self):
         self.mathVars = [] # clear every assigment or expression check
         self.parentsLevel = 1 # clear every assigment  or expression check
-        self.else_if_counter = 0
+        self.else_if_counter = 0# pop element if if statment is terminated
 
         self.vars = [] 
         self.literals = []
@@ -66,6 +67,7 @@ class CalculateTree(Transformer):
         
         self.blockcondition = "" # clear every block
         self.neg = False
+        self.enteredIfForIndent = False
     #def procedure(self, *args):
         #print "procedure " + str(args)
 
@@ -96,7 +98,15 @@ class CalculateTree(Transformer):
                 args1 = "\"" + self.mathVars[-1] +  "\""
             else:
                 args1 = "\"" + self.mathVars[-2] +  "\""
-            
+        if(not isNumber(args1)) : 
+            if(not isVariable(args1)): 
+                raise Exception( "COMPILER ERROR: undefined " + args1 + " for local or global variable!")
+            args1 = "\":" + args1 + "\""
+        if(not isNumber(args2)) : 
+            if(not isVariable(args2)): 
+                raise Exception( "COMPILER ERROR: undefined " + args2 + " for local or global variable!")
+            args2 = "\":" + args2 + "\""
+
         self.mathVars.append(":paren" + str(self.parentsLevel))
         self.parentsLevel += 1
         self.output += "\t"*self.blockLevel +  "(store_mul, \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2)  + "),\n"
@@ -368,28 +378,32 @@ class CalculateTree(Transformer):
 
     def test_expression(self, arg):
         if(arg == None and self.else_if_counter == 0):
-            self.blockcondition = "\t"*(self.blockLevel + 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+            self.blockcondition = "\t"*(self.blockLevel ) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+            self.enteredIfForIndent  = True
         elif(arg == None and self.else_if_counter > 0):
-            self.output += "\t"*(self.blockLevel) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+            self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
         else:
             if arg == "true":
-                self.output += "\t"*(self.blockLevel) +  "(eq, 1,1), \n"
+                self.blockcondition = "\t"*(self.blockLevel + 1) +  "(eq, 1,1), \n"
             elif arg == "false":
-                self.output += "\t"*(self.blockLevel) +  "(eq, 1,0), \n"
+                self.blockcondition = "\t"*(self.blockLevel + 1) +  "(eq, 1,0), \n"
         del self.mathVars[:]
 
     def else_if_block(self, *args):
         pass
 
     def beginblock(self, *args):
-        self.blockLevel += 1
-        self.output +=  "\t"*(self.blockLevel-1)+ "(try_begin),\n" + self.blockcondition
+        tabs = "\t"*(self.blockLevel) if (self.enteredIfForIndent) else ""
+        self.blockLevel += 1       
+        self.output +=  "\t"*(self.blockLevel-1)+ "(try_begin),\n" + tabs + self.blockcondition
         self.blockcondition = ""
+        self.enteredIfForIndent = False
         print("begin!")
 
     def else_if_try(self, *args):
         self.else_if_counter += 1
-        self.output +=  "\t"*(self.blockLevel-1)+ "(else_try),\n" 
+        self.output +=  "\t"*(self.blockLevel-1)+ "(else_try),\n" + self.blockcondition
+        self.blockcondition = ""
         print("else!")
 
     def else_try(self, *args):
@@ -401,7 +415,6 @@ class CalculateTree(Transformer):
         self.blockLevel -= 1
         self.output +=  "\t"*self.blockLevel+ "(try_end),\n\n" 
         print("begin!")
-
 
     def paramsdeclare(self, *args):
         self.append_comment("\t"*self.blockLevel + "#---parameter declarations begin---\n ")
@@ -468,19 +481,18 @@ test : "(" (expression | BOOL ) ")" -> test_expression
 
 ifstatement: if_body endblock 
             | if_body (try_else_if_body)+ (try_else_body)? endblock  -> else_if_block
+
+
 if_body: "if" test beginblock (instruction)*
 try_else_if_body : else_if_try test "then" (instruction)* 
 try_else_body: else_try (instruction)* 
      
-?instruction: variable ";"
-            | assignment ";"
+?instruction: assignment ";"
             | variabledeclare ";"
             | exitprocedure ";"
             | ifstatement
 
 ?expression :  bool_or
-
-
         ?bool_or: bool_and 
             | bool_or  "or" bool_and -> op_or
 
@@ -506,10 +518,6 @@ try_else_body: else_try (instruction)*
              | variable
              | functionexpression
 
-
-
-
-
 	?procedureexprssion: procedurename params
     ?functionexpression: procedurename params 
 		?params:  "("")" 
@@ -531,7 +539,7 @@ try_else_body: else_try (instruction)*
 variabledeclareassign : NAME ":" TYPE ("=" expression) 
 variabledeclare: NAME ":" TYPE 
 variabledeclareglobal: "global" NAME ":" TYPE 
-array: variable "[" sum "]"  
+indexing: variable "[" sum "]"  
 
 ?variable : NAME
 
@@ -540,7 +548,7 @@ NAME: /[A-Za-z][A-Za-z0-9_]*/
 NUMBER: /\d+\.?\d*/
 STRING: /./
 TYPE: "Number" | "String" | "QString" | "Procedure" | "Boolean"
-    | "Faction" | "Presentation" | "Troop" | "Agent" | "Item"
+    | "Faction" | "Presentation" | "Troop" | "Agent" | "Item" | "Array" | "DynamicArray"
 BOOL: "true"
 	| "false"
 
@@ -549,7 +557,7 @@ BOOL: "true"
 %ignore WS
 """
 
-parser = Lark(turtle_grammar, parser='lalr', transformer=CalculateTree())
+parser = Lark(turtle_grammar, parser='lalr', transformer=CalculateTree(), debug=True)
 
 
 
@@ -566,17 +574,21 @@ def test():
        procedure CalculateFactionTension(RelationFacA : Number, RelationFacB: Number)
        begin
             bool1: Boolean; bool2: Boolean; bool3: Boolean; bool4: Boolean;
-
+            array: Array;
 
             if(
                 (bool1 or bool2) or 
-                (true and false) and (1 != 2))
+                (true and false) and (1 != 2)
+              )
             then
+                Number123: Number;
                 RelationFacA = -1 + RelationFacB * (RelationFacA * -100) * 2;
-            else if(2 != 2) then
-                RelationFacA = -1 + RelationFacB * (RelationFacA / -100) * 2;
-            else if(bool1 or false) then
-                RelationFacA = -1 + RelationFacB * ( -RelationFacA * -100) * 2;
+                Number123 = RelationFacA;
+                if(true) then
+                    Number123  = 0;
+                else if(Number123 != Number123) then
+                    Number123 = 9999 - 00;
+                end
             else if(bool2 or true and false) then
                 RelationFacA = -0 + RelationFacB * (RelationFacA * -100) * 2;
             else 

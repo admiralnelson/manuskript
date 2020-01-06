@@ -24,7 +24,7 @@ reservedKeywords = [
         "paren"
     ]
 
-DEBUG = False
+DEBUG = True
 
 def isNumber(s):
     try:
@@ -65,10 +65,12 @@ class CalculateTree(Transformer):
         self.blockLevel  =1 # clear every procedure
         self.output = "" # clear every procedure
         self.paramsdeclares = [] # clear every procedure
+        self.returnTypes = []   # clear every procedure
         
         self.blockcondition = "" # clear every block
+        self.returnRegCounter = 0 # clear every procedure
         self.neg = False
-        self.enteredIfForIndent = False
+        self.enteredIfForIndent = False # clear every procedure
         self.currentProcedureName = ""
         self.proceduresName = []
     #def procedure(self, *args):
@@ -154,6 +156,9 @@ class CalculateTree(Transformer):
 
 
     ################################################  BOOLEAN OPERATIONS BEGIN
+    def op_neg(self, *args):
+        pass
+
     def op_or(self, args1, args2 = None):
         #args1 = str(args1)
         #args2 = str(args2)
@@ -218,7 +223,7 @@ class CalculateTree(Transformer):
         elif(args1 == None):
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
-            self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-3] +"\n")
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-4] +"\n")
             b = 0
             if(args2 == "true"): b = 1
             self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + self.mathVars[-3]  +"\"),\n"
@@ -261,7 +266,100 @@ class CalculateTree(Transformer):
         self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
         self.output += "\t"*self.blockLevel +  "(try_end),\n"
         self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
-          
+
+    def op_gt(self, arg1, arg2):        
+        self.mathVars.append(":bgroup" + str(self.parentsLevel))
+        self.parentsLevel += 1
+        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" > "+ str(arg2) +"\n")
+        self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
+        self.output += "\t"*self.blockLevel +  "(try_begin),\n"
+        self.output += "\t"*((self.blockLevel)+1) +  "(gt," 
+        if(isNumber(arg1)): self.output += str(arg1)
+        else: 
+            if(str(arg1[0] != '$')):
+                self.output += "\":" + str(arg1) + "\""
+        
+        self.output += ","
+
+        if(isNumber(arg2)): self.output += str(arg2)
+        else: 
+            if(str(arg2[0] != '$')):
+                self.output += "\":" + str(arg2) + "\""
+        self.output += "),\n"
+        self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
+        self.output += "\t"*self.blockLevel +  "(try_end),\n"
+        self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
+
+    def op_ge(self, arg1, arg2):        
+        self.mathVars.append(":bgroup" + str(self.parentsLevel))
+        self.parentsLevel += 1
+        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" >= "+ str(arg2) +"\n")
+        self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
+        self.output += "\t"*self.blockLevel +  "(try_begin),\n"
+        self.output += "\t"*((self.blockLevel)+1) +  "(ge," 
+        if(isNumber(arg1)): self.output += str(arg1)
+        else: 
+            if(str(arg1[0] != '$')):
+                self.output += "\":" + str(arg1) + "\""
+        
+        self.output += ","
+
+        if(isNumber(arg2)): self.output += str(arg2)
+        else: 
+            if(str(arg2[0] != '$')):
+                self.output += "\":" + str(arg2) + "\""
+        self.output += "),\n"
+        self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
+        self.output += "\t"*self.blockLevel +  "(try_end),\n"
+        self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
+
+    def op_le(self, arg1, arg2):        
+        self.mathVars.append(":bgroup" + str(self.parentsLevel))
+        self.parentsLevel += 1
+        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" >= "+ str(arg2) +"\n")
+        self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
+        self.output += "\t"*self.blockLevel +  "(try_begin),\n"
+        self.output += "\t"*((self.blockLevel)+1) +  "(le," 
+        if(isNumber(arg1)): self.output += str(arg1)
+        else: 
+            if(str(arg1[0] != '$')):
+                self.output += "\":" + str(arg1) + "\""
+        
+        self.output += ","
+
+        if(isNumber(arg2)): self.output += str(arg2)
+        else: 
+            if(str(arg2[0] != '$')):
+                self.output += "\":" + str(arg2) + "\""
+        self.output += "),\n"
+        self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
+        self.output += "\t"*self.blockLevel +  "(try_end),\n"
+        self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
+
+
+    def op_lt(self, arg1, arg2):        
+        self.mathVars.append(":bgroup" + str(self.parentsLevel))
+        self.parentsLevel += 1
+        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" < "+ str(arg2) +"\n")
+        self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
+        self.output += "\t"*self.blockLevel +  "(try_begin),\n"
+        self.output += "\t"*((self.blockLevel)+1) +  "(lt," 
+        if(isNumber(arg1)): self.output += str(arg1)
+        else: 
+            if(str(arg1[0] != '$')):
+                self.output += "\":" + str(arg1) + "\""
+        
+        self.output += ","
+
+        if(isNumber(arg2)): self.output += str(arg2)
+        else: 
+            if(str(arg2[0] != '$')):
+                self.output += "\":" + str(arg2) + "\""
+        self.output += "),\n"
+        self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
+        self.output += "\t"*self.blockLevel +  "(try_end),\n"
+        self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
+
         #raise Exception("OK")
     def op_neg(self, arg1):
         if(arg1 == None):
@@ -297,8 +395,16 @@ class CalculateTree(Transformer):
 
        # raise Exception("!")
     ################################################  BOOLEAN OPERATIONS END
+    def return_expression(self, arg):
+        if(isNumber(arg)):
+            self.output += "\t"*self.blockLevel +  "(assign, reg"+ str(self.returnRegCounter) +", " + str(arg)  + ")\n"
+        else:
+            var = self.isValidVariable(arg)[0]
+            self.output += "\t"*self.blockLevel +  "(assign, reg"+ str(self.returnRegCounter) +", \"" + str(var)  + "\")\n"
+        self.returnRegCounter += 1
+
     def result(self, *args):
-        self.output += str(args)
+        self.returnRegCounter = 0 
 
     def expression(self, arg1=None):
         if(arg1 == None):
@@ -426,6 +532,7 @@ class CalculateTree(Transformer):
     def endblock(self, *args):
         self.blockLevel -= 1
         self.output +=  "\t"*self.blockLevel+ "(try_end),\n\n" 
+        self.else_if_counter = 0
         print("begin!")
 
     def paramsdeclare(self, *args):
@@ -454,8 +561,11 @@ class CalculateTree(Transformer):
         procedures.append(proc)
         self.blockLevel  =1 # clear every procedure
         self.output = "" # clear every procedure
+        del self.mathVars[:] # clear every procedure
         del self.paramsdeclares[:] # clear every procedure
         del self.vars[:] # clear every procedure
+        self.returnRegCounter = 0 # clear every procedure
+        self.enteredIfForIndent = False # clear every procedure
         print("# procedure" + str(args))
 
     def function(self, *args):
@@ -465,8 +575,11 @@ class CalculateTree(Transformer):
         procedures.append(proc)
         self.blockLevel  =1 # clear every procedure
         self.output = "" # clear every procedure
+        del self.mathVars[:] # clear every procedure
         del self.paramsdeclares[:] # clear every procedure
         del self.vars[:] # clear every procedure
+        self.returnRegCounter = 0 # clear every procedure
+        self.enteredIfForIndent = False # clear every procedure
         print("# function" + str(args))
 
     def procedure_name(self, arg1):
@@ -546,6 +659,8 @@ try_else_body: else_try (instruction)*
             | bool_and  "and" comp -> op_and
 
         ?comp: sum
+            | comp  ">=" sum -> op_ge 
+            | comp  "<=" sum -> op_le 
             | comp  "<" sum -> op_gt 
             | comp  ">" sum -> op_lt
 		    | comp  "!=" sum -> op_neq
@@ -561,6 +676,7 @@ try_else_body: else_try (instruction)*
 		?atom: NUMBER         -> number
 			 | "-" atom       -> op_minus
 			 | "(" expression ")"
+             | "not" expression  -> op_neg
              | variable
              | functionexpression
 
@@ -571,9 +687,11 @@ try_else_body: else_try (instruction)*
 			| "(" variable ("," variable)+ ")" 
 			| "(" expression ")" 
 			| "(" expression ("," expression)+ ")" 
-	
 
-?result : "result" expression 
+return_expression: variable | NUMBER 
+
+?result : ("result" return_expression) -> result
+        | "result" return_expression ("," return_expression )+  -> result   
 
 ?assignment: variable "=" expression
            | variabledeclare "=" expression 
@@ -644,10 +762,10 @@ def test():
        end
        function Factorial(Input: Number) : (Number)
        begin
-            if(Input > 0) then
-                result -100;
+            if((not (Input >= 2)) and (not ( 1 != 2 ) )) then
+                result 23;
             end
-            result 0;
+            result 1 , 2, Input, 4, 5;
        end
 
        
@@ -655,6 +773,7 @@ def test():
     
     tree = parser.parse(text)
     print(tree.pretty())
+    print(str(procedures[0]))
     print(str(procedures[1]))
     #pydot__tree_to_png(tree, "output.png")
 

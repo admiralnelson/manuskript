@@ -58,6 +58,7 @@ class CalculateTree(Transformer):
         self.parentsLevel = 1 # clear every assigment  or expression check
         self.else_if_counter = 0# pop element if if statment is terminated
 
+        self.globals = []
         self.vars = [] 
         self.literals = []
         
@@ -68,6 +69,7 @@ class CalculateTree(Transformer):
         self.blockcondition = "" # clear every block
         self.neg = False
         self.enteredIfForIndent = False
+        self.currentProcedureName = ""
     #def procedure(self, *args):
         #print "procedure " + str(args)
 
@@ -77,6 +79,8 @@ class CalculateTree(Transformer):
             args2 = "\"" + self.mathVars[-1] +  "\""
         if(args1 == None):
             args1 = "\"" + self.mathVars[-3] +  "\""
+        if(isVariable(args2)):
+            self.isValidVariable(args2)
         self.mathVars.append(":paren" + str(self.parentsLevel))
         self.parentsLevel += 1
         self.output += "\t"*self.blockLevel +  "(store_add, \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2) + "),\n"
@@ -84,6 +88,7 @@ class CalculateTree(Transformer):
     def op_sub(self, args1, args2 = None):
         if(args2 == None):
             args2 = "\"" + self.mathVars[-1] +  "\""
+            arg2IsMathVar = True
         if(args1 == None):
             args1 = "\"" + self.mathVars[-3] +  "\""
         self.mathVars.append(":paren" + str(self.parentsLevel))
@@ -91,21 +96,24 @@ class CalculateTree(Transformer):
         self.output += "\t"*self.blockLevel +  "(store_sub, \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2)  + "),\n"
 
     def op_mul(self, args1, args2 = None):
+        arg2IsMathVar = False
         if(args2 == None):
             args2 = "\"" + self.mathVars[-1] +  "\""
         if(args1 == None):
             if(isNumber(args2)):
                 args1 = "\"" + self.mathVars[-1] +  "\""
+                arg2IsMathVar = True
             else:
                 args1 = "\"" + self.mathVars[-2] +  "\""
-        if(not isNumber(args1)) : 
-            if(not isVariable(args1)): 
-                raise Exception( "COMPILER ERROR: undefined " + args1 + " for local or global variable!")
-            args1 = "\":" + args1 + "\""
+
+        if(not isNumber(args1)) :
+            var = self.isValidVariable(args1)
+            if(var[0][0] != "$"):
+                args1 = "\"" + var[0] + "\"" if not arg2IsMathVar else args1 
+            else:
+                args1 = "\"" + var[0] + "\"" 
         if(not isNumber(args2)) : 
-            if(not isVariable(args2)): 
-                raise Exception( "COMPILER ERROR: undefined " + args2 + " for local or global variable!")
-            args2 = "\":" + args2 + "\""
+            if(not isVariable(args2)): raise Exception( "COMPILER ERROR: undefined " + args2 + " for local or global variable!")
 
         self.mathVars.append(":paren" + str(self.parentsLevel))
         self.parentsLevel += 1
@@ -238,10 +246,16 @@ class CalculateTree(Transformer):
         self.output += "\t"*self.blockLevel +  "(try_begin),\n"
         self.output += "\t"*((self.blockLevel)+1) +  "(neq," 
         if(isNumber(arg1)): self.output += str(arg1)
-        else: self.output += "\"" + str(arg1) + "\""
+        else: 
+            if(str(arg1[0] != '$')):
+                self.output += "\":" + str(arg1) + "\""
+        
         self.output += ","
+
         if(isNumber(arg2)): self.output += str(arg2)
-        else: self.output += "\"" + str(arg2) + "\""
+        else: 
+            if(str(arg2[0] != '$')):
+                self.output += "\":" + str(arg2) + "\""
         self.output += "),\n"
         self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
         self.output += "\t"*self.blockLevel +  "(try_end),\n"
@@ -297,32 +311,22 @@ class CalculateTree(Transformer):
         if(arg2==None):
             arg2 = self.mathVars[-1]
             #print(vars[":" + arg1])
-            if(":" + arg1  in vars):
-                self.output +=  "\t"*self.blockLevel  +  "(assign, \":" + arg1 + "\", \"" +  str(arg2) + "\"),\n"
-            elif("$" + arg1  in vars):
-                self.output +=  "\t"*self.blockLevel  +  "(assign, \"$" + arg1 + "\", \"" +  str(arg2) + "\"),\n"
-            else:
-                raise Exception( "COMPILER ERROR: undefined " + arg1 + " for local or global variable!")
+            if(self.isValidVariable(arg1)):
+                self.output +=  "\t"*self.blockLevel  +  "(assign, \":" + arg1 + "\", \"" +  str(arg2) + "\"),\n"            
+            if(arg1[0] == "$"):
+                if(self.isValidVariable(arg1)):
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1 + "\", \"" +  str(arg2) + "\"),\n"
+            
             self.mathVars.pop()
             self.parentsLevel = 1
         else:
             del self.literals[:]
-            if(":" + arg1  in vars):
-                variable = vars[":"+arg1]  
-            elif("$" + arg1  in vars):
-                variable = vars["$"+arg1]
-            else:
-                raise Exception( "COMPILER ERROR: undefined " + arg1 + " for local or global variable!")
+            variable = self.isValidVariable(arg1)[1]
             if(str(type(arg2)) == "<class 'lark.tree.Tree'>"): 
                 # FUNCTION
                 print("TREE!")
             elif(isVariable(arg2)):
-                if(":" + arg2  in vars):
-                    arg2 = "\":" + arg2 + "\""
-                elif("$" + arg2  in vars):
-                    arg2 = "\"$" + arg2 + "\""
-                else:
-                    raise Exception( "COMPILER ERROR: assign " + str(arg1)  + " to undefined variable " + str(arg2) + "!")
+                self.isValidVariable(arg2)
                 
             else:
                 if(variable=="Boolean"):
@@ -352,12 +356,21 @@ class CalculateTree(Transformer):
         if(arg1 in reservedKeywords):
             raise Exception("COMPILER ERROR: " + arg1 + " is reserved keyword!")
         vars = dict(self.vars)
-        if( ":" + arg1 in vars or "$" + arg1 in vars ):
+        if( ":" + arg1 in vars):
             raise Exception("COMPILER ERROR: " + arg1 + " is already defined!")
-
-        self.append_comment("\t"*self.blockLevel+  "# var declare: "+ str(arg1) + " type :" + str(arg2)  + "\n")
-        self.output +=  "\t"*self.blockLevel+ "(assign, \":" + str(arg1) + "\", 0),\n" 
-        self.vars.append(( ":" + str(arg1), str(arg2)))
+        
+        for glob in self.globals:
+            if(glob[0] == arg1):
+                raise Exception("COMPILER ERROR: " + arg1 + " is already defined at " + glob[2] + " as " + glob[1] )
+        
+        if(str(arg1)[0] != "$"):
+            self.append_comment("\t"*self.blockLevel+  "# var declare: "+ str(arg1) + " type :" + str(arg2)  + "\n")
+            self.output +=  "\t"*self.blockLevel+ "(assign, \":" + str(arg1) + "\", 0),\n" 
+            self.vars.append(( ":" + str(arg1), str(arg2)))
+        else:
+            self.append_comment("\t"*self.blockLevel+  "# var declare global: "+ str(arg1) + " type :" + str(arg2)  + "\n")
+            self.output +=  "\t"*self.blockLevel+ "(assign, \""+ str(arg1) + "\", 0),\n" 
+            self.globals.append(( str(arg1), str(arg2), self.currentProcedureName))
 
     def variabledeclareparams(self, arg1, arg2):
         if(arg1 in reservedKeywords):
@@ -365,10 +378,6 @@ class CalculateTree(Transformer):
         self.append_comment("\t"*self.blockLevel+  "# var declare: "+ str(arg1) + " type :" + str(arg2)  + "\n" )
         self.vars.append(( ":" + str(arg1), str(arg2)))
 
-    def variabledeclareglobal(self, arg1, arg2):
-        self.append_comment("\t"*self.blockLevel + "# var declare: "+ str(arg1) + " type :" + str(arg2) + "\n")
-        self.output +=  "\t"*self.blockLevel+ "(assign, \"$" + str(arg1) + "\", 0),\n\n" 
-        self.vars.append(( "$" + str(arg1), str(arg2)))
 
     def block(self, *args):
         if(self.blockLevel == 1):
@@ -436,6 +445,7 @@ class CalculateTree(Transformer):
         self.output +=  "\t"*self.blockLevel + "(eq, 0, 1)"
 
     def procedure(self, *args):
+        self.currentProcedureName = str(args[0])
         proc = "(\"" + str(args[0]) + "\",[\n"
         proc += self.output 
         proc += "]),"
@@ -445,7 +455,22 @@ class CalculateTree(Transformer):
         del self.paramsdeclares[:] # clear every procedure
         del self.vars[:] # clear every procedure
         print("# procedure" + str(args))
+    def procedure_name(self, arg1):
+        self.currentProcedureName = str(arg1 )
 
+    def isValidVariable(self, var):
+        var = str(var)
+        if(var[0] == "$"):
+            for glob in self.globals:
+                if var == glob[0]: return glob
+            raise Exception( "COMPILER ERROR: undefined " + var + " for global variable at procedure: " + self.currentProcedureName)
+        for v in self.vars:
+            if(v[0] == ":" + var): return v
+        for v in self.mathVars:
+            if("\"" + v + "\"" == var): return v
+            if( v == var): return v
+        raise Exception( "COMPILER ERROR: undefined " + var + " for local variable at procedure: " + self.currentProcedureName)
+        
     def append_comment(self, text):
         if(DEBUG):
             self.output += text
@@ -459,7 +484,7 @@ start: (procedure | function)+
 exitprocedure: "die"
 ?function: "function" procedurename paramsdeclare ":" returnsdeclare  mainblock
 
-?procedurename: NAME
+?procedurename: NAME -> procedure_name
 
 paramsdeclare : "("")"  
 				| "(" NAME ":" TYPE ")" 
@@ -538,13 +563,12 @@ try_else_body: else_try (instruction)*
 
 variabledeclareassign : NAME ":" TYPE ("=" expression) 
 variabledeclare: NAME ":" TYPE 
-variabledeclareglobal: "global" NAME ":" TYPE 
 indexing: variable "[" sum "]"  
 
 ?variable : NAME
 
 
-NAME: /[A-Za-z][A-Za-z0-9_]*/
+NAME: /\$?[A-Za-z][A-Za-z0-9_]*/
 NUMBER: /\d+\.?\d*/
 STRING: /./
 TYPE: "Number" | "String" | "QString" | "Procedure" | "Boolean"
@@ -575,14 +599,14 @@ def test():
        begin
             bool1: Boolean; bool2: Boolean; bool3: Boolean; bool4: Boolean;
             array: Array;
-
+            $GLOBAL: Number;
             if(
                 (bool1 or bool2) or 
                 (true and false) and (1 != 2)
               )
             then
                 Number123: Number;
-                RelationFacA = -1 + RelationFacB * (RelationFacA * -100) * 2;
+                RelationFacA = -1 + RelationFacB * (RelationFacA * -100) * 2 + $GLOBAL * 100;
                 Number123 = RelationFacA;
                 if(true) then
                     Number123  = 0;

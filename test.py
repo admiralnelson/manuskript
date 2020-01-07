@@ -168,7 +168,7 @@ class CalculateTree(Transformer):
            
 
     ################################################  MATH OPERATIONS
-    def op_add(self, args1, args2 = None):
+    def op_add_sub(self, args1, args2 = None, op = "store_add"):
         if(args2 == None):
             args2 = "\"" + self.mathVars[-1] +  "\""
         if(args1 == None):
@@ -178,22 +178,9 @@ class CalculateTree(Transformer):
 
         self.mathVars.append(":paren" + str(self.parentsLevel))
         self.parentsLevel += 1
-        self.output += "\t"*self.blockLevel +  "(store_add, \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2)  + "),\n"
+        self.output += "\t"*self.blockLevel +  "(" + op + ", \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2)  + "),\n"
 
-    def op_sub(self, args1, args2 = None):
-        if(args2 == None):
-            args2 = "\"" + self.mathVars[-1] +  "\""
-            arg2IsMathVar = True
-        if(args1 == None):
-            args1 = "\"" + self.mathVars[-3] +  "\""      
-        if(isVariable(args2)):
-            self.isValidVariable(args2)
-
-        self.mathVars.append(":paren" + str(self.parentsLevel))
-        self.parentsLevel += 1
-        self.output += "\t"*self.blockLevel +  "(store_sub, \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2)  + "),\n"
-
-    def op_mul(self, args1, args2 = None):
+    def op_mul_div_mod(self, args1, args2 = None, op = "store_mul"):
         arg2IsMathVar = False
         if(args2 == None):
             args2 = "\"" + self.mathVars[-1] +  "\""
@@ -215,11 +202,11 @@ class CalculateTree(Transformer):
         
         if(str(type(args2)) == "<class 'lark.tree.Tree'>"):
             self.op_process_func_call(str(args2.children[0]), args2.children[1])
-            self.output += "\t"*self.blockLevel +  "(store_mul, \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", reg0),\n"
+            self.output += "\t"*self.blockLevel +  "(" + op +", \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", reg0),\n"
         else:
             self.mathVars.append(":paren" + str(self.parentsLevel))
             self.parentsLevel += 1
-            self.output += "\t"*self.blockLevel +  "(store_mul, \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2)  + "),\n"
+            self.output += "\t"*self.blockLevel +  "(" + op +", \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2)  + "),\n"
 
     def op_minus(self, arg1):
         if(arg1 == None):
@@ -231,21 +218,15 @@ class CalculateTree(Transformer):
             self.mathVars.append(":paren" + str(self.parentsLevel))
             self.output += "\t"*self.blockLevel +  "(assign, \"" +  self.mathVars[-1]  + "\", 1),\n"
             self.output += "\t"*self.blockLevel +  "(val_mul, \"" +  self.mathVars[-1]  + "\", -" + str(arg1) + "),\n"
-            
-        
 
+    def op_sub(self, args1, args2 = None):
+        self.op_add_sub(args1, args2, "store_sub")
+    def op_add(self, args1, args2 = None):
+        self.op_add_sub(args1, args2, "store_add")
     def op_div(self, args1, args2 = None):
-        if(args2 == None):
-            args2 = "\"" + self.mathVars[-1] +  "\""
-        if(args1 == None):
-            if(isNumber(args2)):
-                args1 = "\"" + self.mathVars[-1] +  "\""
-            else:
-                args1 = "\"" + self.mathVars[-2] +  "\""
-            
-        self.mathVars.append(":paren" + str(self.parentsLevel))
-        self.parentsLevel += 1
-        self.output += "\t"*self.blockLevel +  "(store_div, \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2)  + "),\n"
+        self.op_mul_div_mod(args1, args2, "store_div")
+    def op_mul(self, args1, args2 = None):
+        self.op_mul_div_mod(args1, args2, "store_mul")
     ################################################  MATH OPERATIONS END
 
     ################################################  COMPARATION OPERATIONS BEGIN

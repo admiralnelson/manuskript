@@ -12,19 +12,28 @@ from lark.tree import pydot__tree_to_png
 
 reservedKeywords = [
         "procedure",
+        "function",
+        "result",
         "Number",
         "Boolean",
         "if",
         "else",
+        "then",
         "true",
         "false",
         "die",
         "return",
-        "bgroup"
-        "paren"
+        "bgroup",
+        "paren",
+        "begin",
+        "end",
+        "or",
+        "and",
+        "not",
+        
     ]
 
-DEBUG = True
+DEBUG = False
 
 def isNumber(s):
     try:
@@ -70,7 +79,7 @@ class CalculateTree(Transformer):
         self.blockcondition = "" # clear every block
         self.returnRegCounter = 0 # clear every procedure
         self.neg = False
-        self.enteredIfForIndent = False # clear every procedure
+        self.enteredIf = False # clear every procedure
         self.currentProcedureName = ""
         self.proceduresName = []
     #def procedure(self, *args):
@@ -156,8 +165,6 @@ class CalculateTree(Transformer):
 
 
     ################################################  BOOLEAN OPERATIONS BEGIN
-    def op_neg(self, *args):
-        pass
 
     def op_or(self, args1, args2 = None):
         #args1 = str(args1)
@@ -401,13 +408,15 @@ class CalculateTree(Transformer):
     ################################################  BOOLEAN OPERATIONS END
     def return_expression(self, arg):
         if(isNumber(arg)):
-            self.output += "\t"*self.blockLevel +  "(assign, reg"+ str(self.returnRegCounter) +", " + str(arg)  + ")\n"
-        else:
-            var = self.isValidVariable(arg)[0]
-            self.output += "\t"*self.blockLevel +  "(assign, reg"+ str(self.returnRegCounter) +", \"" + str(var)  + "\")\n"
+            self.output += "\t"*self.blockLevel +  "(assign, reg"+ str(self.returnRegCounter) +", " + str(arg)  + "),\n"
+        else:            
+            var = self.isValidVariable(str(arg.children[0]))[0]
+            self.output += "\t"*self.blockLevel +  "(assign, reg"+ str(self.returnRegCounter) +", \"" + str(var)  + "\"),\n"
         self.returnRegCounter += 1
 
     def result(self, *args):
+        if(self.returnRegCounter != len(self.returnTypes)):
+            raise Exception( "COMPILER ERROR: function results returned are " + str(self.returnRegCounter) + " Should be " + str(len(self.returnTypes)) + " results. "+ "At procedure/function " + self.currentProcedureName )
         self.returnRegCounter = 0 
 
     def expression(self, arg1=None):
@@ -430,8 +439,10 @@ class CalculateTree(Transformer):
                 if(self.isValidVariable(arg1)):
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1 + "\", \"" +  str(arg2) + "\"),\n"
             
-            self.mathVars.pop()
+            #self.mathVars.pop()
             self.parentsLevel = 1
+        if(arg1 == None):
+            procedureName = arg2.children[0]
         else:
             del self.literals[:]
             variable = self.isValidVariable(arg1)[1]
@@ -450,31 +461,27 @@ class CalculateTree(Transformer):
                         self.append_comment("\t"*self.blockLevel+  "# "+ str(arg1) + " := false (0) " + "\n")
                         arg2 = 0
                     else: 
-                        raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: boolean true or false ")
+                        raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: boolean true or false" + ". At procedure/function " + self.currentProcedureName )
                     
-
+                matching = [s for s in vars if arg1 in s]
                 if(variable=="Number"):
-                    try:
-                        int(str(arg2))
-                    except ValueError:
-                        raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: Numeric ")
-                    #invalid = arg2 != "true" or "false"
-                    #if(invalid): raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + arg2 + " expect: boolean true or false ")
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + matching[0]  + "\", " +  str(arg2) + "),\n"
+                    if(not isNumber(arg2)):
+                        raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: Numeric" + ". At procedure/function " + self.currentProcedureName )
+                else:
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + matching[0]  + "\", \":" +  str(arg2) + "\"),\n"
 
-            
-            matching = [s for s in vars if arg1 in s]
-            self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + matching[0]  + "\", " +  str(arg2) + "),\n"
 
     def variabledeclare(self, arg1, arg2):
         if(arg1 in reservedKeywords):
-            raise Exception("COMPILER ERROR: " + arg1 + " is reserved keyword!")
+            raise Exception("COMPILER ERROR: " + arg1 + " is reserved keyword! At procedure/function " + self.currentProcedureName )
         vars = dict(self.vars)
         if( ":" + arg1 in vars):
-            raise Exception("COMPILER ERROR: " + arg1 + " is already defined!")
+            raise Exception("COMPILER ERROR: " + arg1 + " is already defined!  At procedure/function " + self.currentProcedureName)
         
         for glob in self.globals:
             if(glob[0] == arg1):
-                raise Exception("COMPILER ERROR: " + arg1 + " is already defined at " + glob[2] + " as " + glob[1] )
+                raise Exception("COMPILER ERROR: " + arg1 + " is already defined at " + glob[2] + " as " + glob[1] + ". At procedure/function " + self.currentProcedureName )
         
         if(str(arg1)[0] != "$"):
             self.append_comment("\t"*self.blockLevel+  "# var declare: "+ str(arg1) + " type :" + str(arg2)  + "\n")
@@ -487,9 +494,10 @@ class CalculateTree(Transformer):
 
     def variabledeclareparams(self, arg1, arg2):
         if(arg1 in reservedKeywords):
-            raise Exception("COMPILER ERROR: " + arg1 + " is reserved keyword!")
+            raise Exception("COMPILER ERROR: " + arg1 + " is reserved keyword! At procedure/function " + self.currentProcedureName )
         self.append_comment("\t"*self.blockLevel+  "# var declare: "+ str(arg1) + " type :" + str(arg2)  + "\n" )
         self.vars.append(( ":" + str(arg1), str(arg2)))
+        self.paramsdeclares.append((":" + str(arg1), str(arg2)))
 
 
     def block(self, *args):
@@ -501,7 +509,7 @@ class CalculateTree(Transformer):
     def test_expression(self, arg):
         if(arg == None and self.else_if_counter == 0):
             self.blockcondition = "\t"*(self.blockLevel ) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
-            self.enteredIfForIndent  = True
+            self.enteredIf  = True
         elif(arg == None and self.else_if_counter > 0):
             self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
         else:
@@ -515,11 +523,11 @@ class CalculateTree(Transformer):
         pass
 
     def beginblock(self, *args):
-        tabs = "\t"*(self.blockLevel) if (self.enteredIfForIndent) else ""
+        tabs = "\t"*(self.blockLevel) if (self.enteredIf) else ""
         self.blockLevel += 1       
         self.output +=  "\t"*(self.blockLevel-1)+ "(try_begin),\n" + tabs + self.blockcondition
         self.blockcondition = ""
-        self.enteredIfForIndent = False
+        self.enteredIf = False
         print("begin!")
 
     def else_if_try(self, *args):
@@ -538,6 +546,9 @@ class CalculateTree(Transformer):
         self.output +=  "\t"*self.blockLevel+ "(try_end),\n\n" 
         self.else_if_counter = 0
         print("begin!")
+
+    def returnsdeclare(self, *args):
+        self.returnTypes.append(str(args[0]))
 
     def paramsdeclare(self, *args):
         self.append_comment("\t"*self.blockLevel + "#---parameter declarations begin---\n ")
@@ -559,7 +570,8 @@ class CalculateTree(Transformer):
         self.output +=  "\t"*self.blockLevel + "(eq, 0, 1)"
 
     def procedure(self, *args):
-        proc = "(\"" + self.currentProcedureName  + "\",[\n"
+        proc = self.WriteDocumentation()
+        proc += "(\"" + self.currentProcedureName  + "\",[\n"
         proc += self.output 
         proc += "]),"
         procedures.append(proc)
@@ -568,12 +580,14 @@ class CalculateTree(Transformer):
         del self.mathVars[:] # clear every procedure
         del self.paramsdeclares[:] # clear every procedure
         del self.vars[:] # clear every procedure
+        del self.returnTypes[:] # clear every procedure
         self.returnRegCounter = 0 # clear every procedure
-        self.enteredIfForIndent = False # clear every procedure
+        self.enteredIf = False # clear every procedure
         print("# procedure" + str(args))
 
     def function(self, *args):
-        proc = "(\"" + self.currentProcedureName  + "\",[\n"
+        proc = self.WriteDocumentation()
+        proc += "(\"" + self.currentProcedureName  + "\",[\n"
         proc += self.output 
         proc += "]),"
         procedures.append(proc)
@@ -582,8 +596,9 @@ class CalculateTree(Transformer):
         del self.mathVars[:] # clear every procedure
         del self.paramsdeclares[:] # clear every procedure
         del self.vars[:] # clear every procedure
+        del self.returnTypes[:] # clear every procedure
         self.returnRegCounter = 0 # clear every procedure
-        self.enteredIfForIndent = False # clear every procedure
+        self.enteredIf = False # clear every procedure
         print("# function" + str(args))
 
     def procedure_name(self, arg1):
@@ -597,14 +612,30 @@ class CalculateTree(Transformer):
         if(var[0] == "$"):
             for glob in self.globals:
                 if var == glob[0]: return glob
-            raise Exception( "COMPILER ERROR: undefined " + var + " for global variable at procedure: " + self.currentProcedureName)
+            raise Exception( "COMPILER ERROR: undefined " + var + " for global variable. At procedure/function " + self.currentProcedureName)
         for v in self.vars:
             if(v[0] == ":" + var): return v
         for v in self.mathVars:
             if("\"" + v + "\"" == var): return v
             if( v == var): return v
-        raise Exception( "COMPILER ERROR: undefined " + var + " for local variable at procedure: " + self.currentProcedureName)
-        
+        if var in self.proceduresName: return var
+        raise Exception( "COMPILER ERROR: undefined " + var + " for local variable. At procedure/function " + self.currentProcedureName)
+    
+    def WriteDocumentation(self):
+        proc =  "\t #script_" +  self.currentProcedureName + "\n"
+        proc += "\t #Input: \n" 
+        for s in self.paramsdeclares:
+            proc += "\t #  - "  + s[0] + " as "+ s[1]+ "\n" 
+        proc += "\t #Output: \n"
+        if(len(self.returnTypes) == 0):
+            proc += "\t #  - None (procedure) \n"
+        else:
+           i = 0
+           for s in self.returnTypes:
+                proc += "\t #  - reg"  + str(i) + " as "+ s+ "\n"
+                i += 1
+        return proc
+
     def append_comment(self, text):
         if(DEBUG):
             self.output += text
@@ -653,6 +684,8 @@ try_else_body: else_try (instruction)*
             | exitprocedure ";"
             | result ";"
             | ifstatement
+            | procedure_expr ";"
+
             
 
 ?expression :  bool_or
@@ -682,17 +715,18 @@ try_else_body: else_try (instruction)*
 			 | "(" expression ")"
              | "not" expression  -> op_neg
              | variable
-             | functionexpression
+             | function_expr
+             | NUMBER_NEG
 
-	?procedureexprssion: procedurename params
-    ?functionexpression: procedurename params 
+	?procedure_expr: variable params
+    ?function_expr: variable params 
 		?params:  "("")" 
 			| "(" variable ")" 
 			| "(" variable ("," variable)+ ")" 
 			| "(" expression ")" 
 			| "(" expression ("," expression)+ ")" 
 
-return_expression: variable | (NUMBER_NEG )
+return_expression: procedure_call_name | (NUMBER_NEG )
 
 ?result : ("result" return_expression) -> result
         | "result" return_expression ("," return_expression )+  -> result   
@@ -710,7 +744,7 @@ variabledeclare: NAME ":" TYPE
 indexing: variable "[" sum "]"  
 
 ?variable : NAME
-
+procedure_call_name : NAME
 
 NAME: /\$?[A-Za-z][A-Za-z0-9_]*/
 NUMBER: /\d+\.?\d*/
@@ -768,9 +802,10 @@ def test():
        function Factorial(Input: Number) : (Number)
        begin
             if((not (Input >= 2)) and (not ( 1 != 2 ) )) then
+                x : Number = Factorial(12);
                 result 23;
-            end
-            result 1 , -2, Input, 4, 5;
+            end            
+            result 1;
        end
 
        

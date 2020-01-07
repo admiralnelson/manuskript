@@ -99,6 +99,7 @@ class CalculateTree(Transformer):
         self.returnTypes = []   # clear every procedure
         
         self.blockcondition = "" # clear every block
+        self.recursiveProcCall = "" # clear after recursion is done
         self.returnRegCounter = 0 # clear every procedure
         self.neg = False
         self.enteredIf = False # clear every procedure
@@ -149,7 +150,7 @@ class CalculateTree(Transformer):
         if(dest == None):
             dest = self.lastVariableNameDeclared
         if(str(dest[1]) == returnTypes[0]):
-            self.output +=  "\t"*self.blockLevel  +  "(call_script, \"script_" + functionToCall + "\""
+            self.recursiveProcCall =  "\t"*self.blockLevel  +  "(call_script, \"script_" + functionToCall + "\""
             if(str(type(parameterInput)) == "<class 'lark.tree.Tree'>"):
                 i = 0
                 for call_arg in parameterInput.children:
@@ -157,12 +158,12 @@ class CalculateTree(Transformer):
                         raise Exception( "COMPILER ERROR: Number of parameters passed to function " + str(funcName)  + " does not match. Required: " + str(len(paramsdeclares)) + ", paramater passed: " + str(i + 1) + ". At procedure/function " + self.currentProcedureName )
                     if(isNumber(call_arg)):
                         if(paramsdeclares[i][1] == "Number"):
-                            self.output += ", " + str(call_arg)
+                            self.recursiveProcCall += ", " + str(call_arg)
                         else:
                             raise Exception( "COMPILER ERROR: Parameter of function " + str(funcName)  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expected: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
                     elif(isBooleanLiteral(call_arg)):
                         if(paramsdeclares[i][1] == "Boolean"):                                    
-                            self.output += ", " + str(call_arg)
+                            self.recursiveProcCall += ", " + str(call_arg)
                         else:
                             raise Exception( "COMPILER ERROR: Parameter of function " + str(funcName)  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expected: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
                     elif(str(type(call_arg)) == "<class 'lark.tree.Tree'>"):
@@ -174,9 +175,9 @@ class CalculateTree(Transformer):
                         var = self.isValidVariable(call_arg)
                         if(paramsdeclares[i][1] == var[1]):
                             if(not IsLocalVariable(var[0]) or mathVars):
-                                self.output += ", \"" + str(call_arg) + "\""
+                                self.recursiveProcCall += ", \"" + str(call_arg) + "\""
                             else:
-                                self.output += ", \":" + str(call_arg) + "\""
+                                self.recursiveProcCall += ", \":" + str(call_arg) + "\""
                         else:
                             raise Exception( "COMPILER ERROR: Parameter of function " + str(funcName)  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expected: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
                     i += 1
@@ -185,11 +186,12 @@ class CalculateTree(Transformer):
             else:
                 for call_arg in parameterInput[1:]:
                     self.output += "," + str(call_arg)
-            self.output += "),\n"
+            if(str(type(parameterInput.children[0])) == "<class 'lark.tree.Tree'>"):
+                self.recursiveProcCall += "OK DONE"
+            self.output += self.recursiveProcCall + "),\n"           
             self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + dest[0]   + "\", reg0),\n"
         else:
             raise Exception( "COMPILER ERROR: " + dest[0]  + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: function with return type "+ self.lastVariableNameDeclared[1] +". At procedure/function " + self.currentProcedureName )
-           
 
     ################################################  MATH OPERATIONS
     def op_add_sub(self, args1, args2 = None, op = "store_add"):
@@ -886,7 +888,7 @@ def test():
        begin
             boolean: Boolean;
             if((not (Input >= 2)) and (not ( 1 != 2 ) )) then 
-                x : Number = Addition2( Addition2( 1, 2, 3 ), Addition2( 1, 2, 3 ), Addition2( 1, 2, 3 ) );                
+                x : Number = Addition2( Addition2( 1, 2 ,3 ), Addition2( 1, 2 ,3 ) ,Addition2( 1, 2 ,3 ) );                
                 result x;
             end            
             result 1;

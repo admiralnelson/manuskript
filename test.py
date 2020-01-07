@@ -35,6 +35,9 @@ reservedKeywords = [
 
 DEBUG = False
 
+BOOLEAN = 1
+NUMBER = 2
+
 def isNumber(s):
     try:
         int(str(s))
@@ -51,13 +54,20 @@ def ConvertBooleanLiteralToNumeric(s):
     if s == "true" : return 1
     if s == "false" : return 0
 
-def AllElementsAreNone(l):
+def ElementContainsNone(l):
+    j = 0
     for i in l:
-        if(i != None): return False
-    return True
+        j += 1
+        if(i == None): return j
+    return False
 
 def IsLocalVariable(s):
     return s[0] != "$"
+
+def DecorateWithQuotes(s):
+    if(s[0] != "\"" and s[1] != "$"): return s
+    if(s[0] != "\""): return s
+    return "\""  + s  + "\"" 
 
 def isVariable(s):
     if(str(s) == "true") : return False
@@ -95,6 +105,8 @@ class CalculateTree(Transformer):
         self.currentProcedureName = ""
         self.lastVariableNameDeclared = () # clear every assigment
         self.proceduresName = []
+
+        self.advanceIndexInProcessFuncCall = 0 # will be incremented at op_process_func_call and reset at assigment
     #def procedure(self, *args):
         #print "procedure " + str(args)
 
@@ -103,8 +115,17 @@ class CalculateTree(Transformer):
         functionToCall = ""
         paramsdeclares = []
         mathVars = False
-        if(AllElementsAreNone(parameterInput.children)):
-            parameterInput.children = self.mathVars[:]
+        if(ElementContainsNone(parameterInput.children)):
+            # FIX ME
+            temp = []
+            j = self.advanceIndexInProcessFuncCall
+            for el in  parameterInput.children:
+                if( el == None):
+                    temp.append(self.mathVars[j])
+                    j += 1
+                #else: temp.append(el)
+            parameterInput.children = temp
+            self.advanceIndexInProcessFuncCall += 1
             mathVars = True
         if(self.currentProcedureName == funcName):
             functionToCall = self.currentProcedureName
@@ -122,9 +143,12 @@ class CalculateTree(Transformer):
                 raise Exception( "COMPILER ERROR: " + str(funcName)  + " is procedure, which does not return any value. At procedure/function " + self.currentProcedureName )
 
         if(len(returnTypes) > 1):
-            print("WARNING, function " + functionToCall + " returned multiple result (" + str(len(returnTypes)) + ")")
-            self.append_warning("function " + functionToCall + " returned multiple result (" + str(len(returnTypes)) + ")")
-        if(str(self.lastVariableNameDeclared[1]) == returnTypes[0]):
+            pass
+            #print("WARNING, function " + functionToCall + " returned multiple result (" + str(len(returnTypes)) + ")")
+            #self.append_warning("function " + functionToCall + " returned multiple result (" + str(len(returnTypes)) + ")")
+        if(dest == None):
+            dest = self.lastVariableNameDeclared
+        if(str(dest[1]) == returnTypes[0]):
             self.output +=  "\t"*self.blockLevel  +  "(call_script, \"script_" + functionToCall + "\""
             if(str(type(parameterInput)) == "<class 'lark.tree.Tree'>"):
                 i = 0
@@ -135,12 +159,15 @@ class CalculateTree(Transformer):
                         if(paramsdeclares[i][1] == "Number"):
                             self.output += ", " + str(call_arg)
                         else:
-                            raise Exception( "COMPILER ERROR: Parameter of function " + str(funcName)  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expect: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
+                            raise Exception( "COMPILER ERROR: Parameter of function " + str(funcName)  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expected: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
                     elif(isBooleanLiteral(call_arg)):
                         if(paramsdeclares[i][1] == "Boolean"):                                    
                             self.output += ", " + str(call_arg)
                         else:
-                            raise Exception( "COMPILER ERROR: Parameter of function " + str(funcName)  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expect: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
+                            raise Exception( "COMPILER ERROR: Parameter of function " + str(funcName)  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expected: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
+                    elif(str(type(call_arg)) == "<class 'lark.tree.Tree'>"):
+                        self.advanceIndexInProcessFuncCall += 1
+                        self.op_process_func_call(call_arg.children[0], call_arg.children[1])
                     elif(call_arg == None):
                         self.output += ", \"" + self.mathVars[-1] + "\""
                     elif(self.isValidVariable(call_arg)):
@@ -151,20 +178,17 @@ class CalculateTree(Transformer):
                             else:
                                 self.output += ", \":" + str(call_arg) + "\""
                         else:
-                            raise Exception( "COMPILER ERROR: Parameter of function " + str(funcName)  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expect: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
+                            raise Exception( "COMPILER ERROR: Parameter of function " + str(funcName)  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expected: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
                     i += 1
                 if( i != len(paramsdeclares)):
-                    raise Exception( "COMPILER ERROR: Number of parameters passed to function " + str(funcName)  + " does not match. Required: " + str(len(paramsdeclares)) + ", paramater passed: " + str(i + 1) + ". At procedure/function " + self.currentProcedureName )
+                    raise Exception( "COMPILER ERROR: Number of parameters passed to function " + str(funcName)  + " does not match. Required: " + str(len(paramsdeclares)) + ", paramater passed: " + str(i) + ". At procedure/function " + self.currentProcedureName )
             else:
                 for call_arg in parameterInput[1:]:
                     self.output += "," + str(call_arg)
             self.output += "),\n"
-            if(dest == None):
-                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", reg0),\n"
-            else:
-                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + dest   + "\", reg0),\n"
+            self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + dest[0]   + "\", reg0),\n"
         else:
-            raise Exception( "COMPILER ERROR: " + self.lastVariableNameDeclared[0]  + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: function with return type "+ self.lastVariableNameDeclared[1] +". At procedure/function " + self.currentProcedureName )
+            raise Exception( "COMPILER ERROR: " + dest[0]  + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: function with return type "+ self.lastVariableNameDeclared[1] +". At procedure/function " + self.currentProcedureName )
            
 
     ################################################  MATH OPERATIONS
@@ -172,9 +196,24 @@ class CalculateTree(Transformer):
         if(args2 == None):
             args2 = "\"" + self.mathVars[-1] +  "\""
         if(args1 == None):
-            args1 = "\"" + self.mathVars[-3] +  "\""
-        if(isVariable(args2)):
-            self.isValidVariable(args2)
+            if(len(self.mathVars) > 2):
+                args1 = "\"" + self.mathVars[-3] +  "\""
+            else:
+                args1 = "\"" + self.mathVars[-2] +  "\""
+
+        if(isNumber(args1)):
+            args1 = str(args1)
+        elif(IsLocalVariable(args1)):
+            args1 = "\"" + self.isValidVariable(args1)[0] + "\""
+
+        if(isNumber(args2)):
+            args2 = str(args2)
+        elif(str(type(args2)) == "<class 'lark.tree.Tree'>"):
+            self.op_process_func_call(str(args2.children[0]), args2.children[1])
+            self.advanceIndexInProcessFuncCall = 0
+            self.output += "\t"*self.blockLevel +  "(" + op +", \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", reg0),\n"
+        elif(IsLocalVariable(args2)):
+            args2 = "\"" + self.isValidVariable(args2)[0] + "\""
 
         self.mathVars.append(":paren" + str(self.parentsLevel))
         self.parentsLevel += 1
@@ -228,11 +267,6 @@ class CalculateTree(Transformer):
     def op_mul(self, args1, args2 = None):
         self.op_mul_div_mod(args1, args2, "store_mul")
     ################################################  MATH OPERATIONS END
-
-    ################################################  COMPARATION OPERATIONS BEGIN
-
-
-    ################################################  COMPARATION OPERATIONS END
 
 
     ################################################  BOOLEAN OPERATIONS BEGIN
@@ -326,13 +360,13 @@ class CalculateTree(Transformer):
             self.output += "\t"*(self.blockLevel) +  "(store_and, \""+ self.mathVars[-1]  +"\", \":"+ args1  +"\", " + str(args2) +"),\n"
         #print str(args1) + " second args " + str(args2)
 
-    def op_neq(self, arg1, arg2):        
+    def op_neq_gt_lt_le_ge_eq(self, arg1, arg2, op = "neq"):        
         self.mathVars.append(":bgroup" + str(self.parentsLevel))
         self.parentsLevel += 1
-        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" neq "+ str(arg2) +"\n")
+        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" "+ op + " "+ str(arg2) +"\n")
         self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
         self.output += "\t"*self.blockLevel +  "(try_begin),\n"
-        self.output += "\t"*((self.blockLevel)+1) +  "(neq," 
+        self.output += "\t"*((self.blockLevel)+1) +  "("+ op +"," 
         if(isNumber(arg1)): self.output += str(arg1)
         else: 
             if(str(arg1[0] != '$')):
@@ -349,100 +383,6 @@ class CalculateTree(Transformer):
         self.output += "\t"*self.blockLevel +  "(try_end),\n"
         self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
 
-    def op_gt(self, arg1, arg2):        
-        self.mathVars.append(":bgroup" + str(self.parentsLevel))
-        self.parentsLevel += 1
-        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" > "+ str(arg2) +"\n")
-        self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
-        self.output += "\t"*self.blockLevel +  "(try_begin),\n"
-        self.output += "\t"*((self.blockLevel)+1) +  "(gt," 
-        if(isNumber(arg1)): self.output += str(arg1)
-        else: 
-            if(str(arg1[0] != '$')):
-                self.output += "\":" + str(arg1) + "\""
-        
-        self.output += ","
-
-        if(isNumber(arg2)): self.output += str(arg2)
-        else: 
-            if(str(arg2[0] != '$')):
-                self.output += "\":" + str(arg2) + "\""
-        self.output += "),\n"
-        self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
-        self.output += "\t"*self.blockLevel +  "(try_end),\n"
-        self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
-
-    def op_ge(self, arg1, arg2):        
-        self.mathVars.append(":bgroup" + str(self.parentsLevel))
-        self.parentsLevel += 1
-        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" >= "+ str(arg2) +"\n")
-        self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
-        self.output += "\t"*self.blockLevel +  "(try_begin),\n"
-        self.output += "\t"*((self.blockLevel)+1) +  "(ge," 
-        if(isNumber(arg1)): self.output += str(arg1)
-        else: 
-            if(str(arg1[0] != '$')):
-                self.output += "\":" + str(arg1) + "\""
-        
-        self.output += ","
-
-        if(isNumber(arg2)): self.output += str(arg2)
-        else: 
-            if(str(arg2[0] != '$')):
-                self.output += "\":" + str(arg2) + "\""
-        self.output += "),\n"
-        self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
-        self.output += "\t"*self.blockLevel +  "(try_end),\n"
-        self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
-
-    def op_le(self, arg1, arg2):        
-        self.mathVars.append(":bgroup" + str(self.parentsLevel))
-        self.parentsLevel += 1
-        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" >= "+ str(arg2) +"\n")
-        self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
-        self.output += "\t"*self.blockLevel +  "(try_begin),\n"
-        self.output += "\t"*((self.blockLevel)+1) +  "(le," 
-        if(isNumber(arg1)): self.output += str(arg1)
-        else: 
-            if(str(arg1[0] != '$')):
-                self.output += "\":" + str(arg1) + "\""
-        
-        self.output += ","
-
-        if(isNumber(arg2)): self.output += str(arg2)
-        else: 
-            if(str(arg2[0] != '$')):
-                self.output += "\":" + str(arg2) + "\""
-        self.output += "),\n"
-        self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
-        self.output += "\t"*self.blockLevel +  "(try_end),\n"
-        self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
-
-
-    def op_lt(self, arg1, arg2):        
-        self.mathVars.append(":bgroup" + str(self.parentsLevel))
-        self.parentsLevel += 1
-        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" < "+ str(arg2) +"\n")
-        self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
-        self.output += "\t"*self.blockLevel +  "(try_begin),\n"
-        self.output += "\t"*((self.blockLevel)+1) +  "(lt," 
-        if(isNumber(arg1)): self.output += str(arg1)
-        else: 
-            if(str(arg1[0] != '$')):
-                self.output += "\":" + str(arg1) + "\""
-        
-        self.output += ","
-
-        if(isNumber(arg2)): self.output += str(arg2)
-        else: 
-            if(str(arg2[0] != '$')):
-                self.output += "\":" + str(arg2) + "\""
-        self.output += "),\n"
-        self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
-        self.output += "\t"*self.blockLevel +  "(try_end),\n"
-        self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
-
-        #raise Exception("OK")
     def op_neg(self, arg1):
         if(arg1 == None):
             args2 = "\"" + self.mathVars[-1] +  "\""
@@ -475,7 +415,19 @@ class CalculateTree(Transformer):
             self.output += "\t"*self.blockLevel +  "(try_end),\n"
 
 
-       # raise Exception("!")
+    def op_neq(self, arg1, arg2):        
+        self.op_neq_gt_lt_le_ge_eq(arg1, arg2, "neq")
+    def op_gt(self, arg1, arg2):        
+        self.op_neq_gt_lt_le_ge_eq(arg1, arg2, "gt")
+    def op_ge(self, arg1, arg2):        
+        self.op_neq_gt_lt_le_ge_eq(arg1, arg2, "ge")
+    def op_le(self, arg1, arg2):        
+        self.op_neq_gt_lt_le_ge_eq(arg1, arg2, "le")
+    def op_lt(self, arg1, arg2):        
+        self.op_neq_gt_lt_le_ge_eq(arg1, arg2, "lt")
+    def op_eq(self, arg1, arg2):        
+        self.op_neq_gt_lt_le_ge_eq(arg1, arg2, "eq")
+
     ################################################  BOOLEAN OPERATIONS END
     def return_expression(self, arg):
         if(isNumber(arg)):
@@ -503,9 +455,11 @@ class CalculateTree(Transformer):
         vars = dict(self.vars)
         if(arg2==None):
             arg2 = self.mathVars[-1]
+            
             #print(vars[":" + arg1])
             if (arg1 == None):
-                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", " +  str(arg2) + "),\n"    
+                arg2 = DecorateWithQuotes(str(arg2))
+                #self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", " +  str(arg2) + "),\n"    
             elif(self.isValidVariable(arg1)):
                 self.output +=  "\t"*self.blockLevel  +  "(assign, \":" + arg1 + "\", \"" +  str(arg2) + "\"),\n"            
             elif(arg1[0] == "$"):
@@ -522,7 +476,7 @@ class CalculateTree(Transformer):
                     var = self.isValidVariable(arg2)[0]
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", \"" +  str(var) + "\"),\n"
                 else:
-                   raise Exception( "COMPILER ERROR: " + self.lastVariableNameDeclared[0]  + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: Numeric" + ". At procedure/function " + self.currentProcedureName )
+                   raise Exception( "COMPILER ERROR: " + self.lastVariableNameDeclared[0]  + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: Numeric" + ". At procedure/function " + self.currentProcedureName )
             elif(str(self.lastVariableNameDeclared[1]) == "Boolean"):
                 if(isBooleanLiteral(arg2)):
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", " +  str(arg2) + "),\n"
@@ -530,11 +484,12 @@ class CalculateTree(Transformer):
                     var = self.isValidVariable(arg2)[0]
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", \"" +  str(var) + "\"),\n"
                 else:
-                    raise Exception( "COMPILER ERROR: " + self.lastVariableNameDeclared[0]  + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: boolean true or false" + ". At procedure/function " + self.currentProcedureName )
+                    raise Exception( "COMPILER ERROR: " + self.lastVariableNameDeclared[0]  + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: boolean true or false" + ". At procedure/function " + self.currentProcedureName )
             else:
                 raise Exception("Not implemented")        
         elif(str(type(arg2)) == "<class 'lark.tree.Tree'>"):
              self.op_process_func_call(arg2.children[0], arg2.children[1])
+             self.advanceIndexInProcessFuncCall = 0
         else:
             del self.literals[:]
             variable = self.isValidVariable(arg1)[1]
@@ -553,13 +508,13 @@ class CalculateTree(Transformer):
                         self.append_comment("\t"*self.blockLevel+  "# "+ str(arg1) + " := false (0) " + "\n")
                         arg2 = 0
                     else: 
-                        raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: boolean true or false" + ". At procedure/function " + self.currentProcedureName )
+                        raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: boolean true or false" + ". At procedure/function " + self.currentProcedureName )
                     
                 matching = [s for s in vars if arg1 in s]
                 if(variable=="Number"):
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + matching[0]  + "\", " +  str(arg2) + "),\n"
                     if(not isNumber(arg2)):
-                        raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: Numeric" + ". At procedure/function " + self.currentProcedureName )
+                        raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: Numeric" + ". At procedure/function " + self.currentProcedureName )
                 else:
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + matching[0]  + "\", \":" +  str(arg2) + "\"),\n"
 
@@ -714,11 +669,12 @@ class CalculateTree(Transformer):
         for v in self.vars:
             if(v[0] == ":" + var): return v
         for v in self.mathVars:
-            if("\"" + v + "\"" == var): return (v, "Number")
-            if( v == var): return (v, "Number")
+            if("\"" + v + "\"" == var): return (v, self.InternalVariable(v))
+            if( v == var): return (v, self.InternalVariable(v))
         if var in self.proceduresName: return var
         raise Exception( "COMPILER ERROR: undefined " + var + " for local variable. At procedure/function " + self.currentProcedureName)
-    
+        
+
     def WriteDocumentation(self):
         proc =  "\t #script_" +  self.currentProcedureName + "\n"
         proc += "\t #Input: \n" 
@@ -739,6 +695,13 @@ class CalculateTree(Transformer):
             if(n[0] == name):
                 return n
         return None
+
+    def InternalVariable(self, name):
+        if(name.startswith(":bgroup")): return "Boolean"
+        if(name.startswith(":paren")): return "Number"
+        return False
+
+
 
     def append_comment(self, text):
         if(DEBUG):
@@ -803,6 +766,7 @@ try_else_body: else_try (instruction)*
 
         ?comp: sum
             | comp  ">=" sum -> op_ge 
+            | comp  "==" sum -> op_eq 
             | comp  "<=" sum -> op_le 
             | comp  "<" sum -> op_gt 
             | comp  ">" sum -> op_lt
@@ -912,9 +876,9 @@ def test():
             result output;
        end
 
-       function Addition2(abc: Number, bca: Number) : (Number, Number)
+       function Addition2(abc: Number, bca: Number, x: Number) : (Number, Number)
        begin
-            output: Number = bca + abc;
+            output: Number = bca + abc + 3 * 40;
             result output, output;
        end
        
@@ -922,7 +886,7 @@ def test():
        begin
             boolean: Boolean;
             if((not (Input >= 2)) and (not ( 1 != 2 ) )) then 
-                x : Number = Addition2(12, -99 + 315 * Addition2(1+2, 2 + 7));
+                x : Number = Addition2( Addition2( 1, 2, 3 ), Addition2( 1, 2, 3 ), Addition2( 1, 2, 3 ) );                
                 result x;
             end            
             result 1;

@@ -222,11 +222,15 @@ class CalculateTree(Transformer):
             self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\"," + str(b) +"),\n"
         elif(args1 == None):
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
-            self.parentsLevel += 1
-            self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-4] +"\n")
+            self.parentsLevel += 1            
             b = 0
             if(args2 == "true"): b = 1
-            self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + self.mathVars[-3]  +"\"),\n"
+            if(self.parentsLevel % 2 > 0):
+                self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-3] +"\n")
+                self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + self.mathVars[-3]  +"\"),\n"
+            else:
+                self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-4] +"\n")
+                self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + self.mathVars[-4]  +"\"),\n"
         elif(args1 != None and args2 == None):
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
@@ -688,7 +692,7 @@ try_else_body: else_try (instruction)*
 			| "(" expression ")" 
 			| "(" expression ("," expression)+ ")" 
 
-return_expression: variable | NUMBER 
+return_expression: variable | (NUMBER_NEG )
 
 ?result : ("result" return_expression) -> result
         | "result" return_expression ("," return_expression )+  -> result   
@@ -710,6 +714,7 @@ indexing: variable "[" sum "]"
 
 NAME: /\$?[A-Za-z][A-Za-z0-9_]*/
 NUMBER: /\d+\.?\d*/
+NUMBER_NEG: /\-?\d+\.?\d*/
 STRING: /./
 TYPE: "Number" | "String" | "QString" | "Procedure" | "Boolean"
     | "Faction" | "Presentation" | "Troop" | "Agent" | "Item" | "Array" | "DynamicArray"
@@ -741,8 +746,8 @@ def test():
             array: Array;
             $GLOBAL: Number;
             if(
-                (bool1 or bool2) or 
-                (true and false) and (1 != 2)
+                (bool1 or bool2) or not(
+                (true and false) and (1 != 2))
               )
             then
                 Number123: Number;
@@ -765,7 +770,7 @@ def test():
             if((not (Input >= 2)) and (not ( 1 != 2 ) )) then
                 result 23;
             end
-            result 1 , 2, Input, 4, 5;
+            result 1 , -2, Input, 4, 5;
        end
 
        

@@ -81,6 +81,7 @@ class CalculateTree(Transformer):
         self.neg = False
         self.enteredIf = False # clear every procedure
         self.currentProcedureName = ""
+        self.lastVariableNameDeclared = () # clear every assigment
         self.proceduresName = []
     #def procedure(self, *args):
         #print "procedure " + str(args)
@@ -441,8 +442,25 @@ class CalculateTree(Transformer):
             
             #self.mathVars.pop()
             self.parentsLevel = 1
-        if(arg1 == None):
-            procedureName = arg2.children[0]
+        if(arg1 == None):            
+            if(str(self.lastVariableNameDeclared[1]) == "Number"):
+                if(isNumber(arg2)):
+                   self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", " +  str(arg2) + "),\n"
+                elif(self.isValidVariable(arg2)):
+                    var = self.isValidVariable(arg2)[0]
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", \"" +  str(var) + "\"),\n"
+                else:
+                   raise Exception( "COMPILER ERROR: " + self.lastVariableNameDeclared[0]  + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: Numeric" + ". At procedure/function " + self.currentProcedureName )
+            elif(str(self.lastVariableNameDeclared[1]) == "Boolean"):
+                if(isBooleanLiteral(arg2)):
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", " +  str(arg2) + "),\n"
+                elif(self.isValidVariable(arg2)):
+                    var = self.isValidVariable(arg2)[0]
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", \"" +  str(var) + "\"),\n"
+                else:
+                    raise Exception( "COMPILER ERROR: " + self.lastVariableNameDeclared[0]  + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: boolean true or false" + ". At procedure/function " + self.currentProcedureName )
+            else:
+                procedureName = arg2.children[0]
         else:
             del self.literals[:]
             variable = self.isValidVariable(arg1)[1]
@@ -486,11 +504,13 @@ class CalculateTree(Transformer):
         if(str(arg1)[0] != "$"):
             self.append_comment("\t"*self.blockLevel+  "# var declare: "+ str(arg1) + " type :" + str(arg2)  + "\n")
             self.output +=  "\t"*self.blockLevel+ "(assign, \":" + str(arg1) + "\", 0),\n" 
-            self.vars.append(( ":" + str(arg1), str(arg2)))
+            self.vars.append(( ":" + arg1, arg2))
+            self.lastVariableNameDeclared  = (":" + arg1, arg2)
         else:
             self.append_comment("\t"*self.blockLevel+  "# var declare global: "+ str(arg1) + " type :" + str(arg2)  + "\n")
             self.output +=  "\t"*self.blockLevel+ "(assign, \""+ str(arg1) + "\", 0),\n" 
-            self.globals.append(( str(arg1), str(arg2), self.currentProcedureName))
+            self.globals.append(( arg1, arg2, self.currentProcedureName))
+            self.lastVariableNameDeclared  = (arg1, arg1)
 
     def variabledeclareparams(self, arg1, arg2):
         if(arg1 in reservedKeywords):
@@ -726,7 +746,7 @@ try_else_body: else_try (instruction)*
 			| "(" expression ")" 
 			| "(" expression ("," expression)+ ")" 
 
-return_expression: procedure_call_name | (NUMBER_NEG )
+return_expression: procedure_call_name | (NUMBER_NEG | NUMBER )
 
 ?result : ("result" return_expression) -> result
         | "result" return_expression ("," return_expression )+  -> result   
@@ -748,7 +768,7 @@ procedure_call_name : NAME
 
 NAME: /\$?[A-Za-z][A-Za-z0-9_]*/
 NUMBER: /\d+\.?\d*/
-NUMBER_NEG: /\-?\d+\.?\d*/
+NUMBER_NEG: /\-\d+\.?\d*/
 STRING: /./
 TYPE: "Number" | "String" | "QString" | "Procedure" | "Boolean"
     | "Faction" | "Presentation" | "Troop" | "Agent" | "Item" | "Array" | "DynamicArray"
@@ -776,7 +796,7 @@ def test():
     text = """
        procedure CalculateFactionTension(RelationFacA : Number, RelationFacB: Number)
        begin
-            bool1: Boolean; bool2: Boolean; bool3: Boolean; bool4: Boolean;
+            bool1: Boolean = bool1; bool2: Boolean; bool3: Boolean; bool4: Boolean = bool3;
             array: Array;
             $GLOBAL: Number;
             if(
@@ -802,7 +822,7 @@ def test():
        function Factorial(Input: Number) : (Number)
        begin
             if((not (Input >= 2)) and (not ( 1 != 2 ) )) then
-                x : Number = Factorial(12);
+                x : Number = 4554;
                 result 23;
             end            
             result 1;

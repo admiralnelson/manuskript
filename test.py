@@ -47,6 +47,13 @@ def isBooleanLiteral(s):
     if s == "false" : return True
     return False
 
+def ConvertBooleanLiteralToNumeric(s):
+    if s == "true" : return 1
+    if s == "false" : return 0
+
+def IsLocalVariable(s):
+    return s[0] != "$"
+
 def isVariable(s):
     if(str(s) == "true") : return False
     if(str(s) == "false") : return False
@@ -85,6 +92,9 @@ class CalculateTree(Transformer):
         self.proceduresName = []
     #def procedure(self, *args):
         #print "procedure " + str(args)
+
+    def op_process_func_proc_call():
+        pass
 
     ################################################  MATH OPERATIONS
     def op_add(self, args1, args2 = None):
@@ -434,15 +444,17 @@ class CalculateTree(Transformer):
         if(arg2==None):
             arg2 = self.mathVars[-1]
             #print(vars[":" + arg1])
-            if(self.isValidVariable(arg1)):
+            if (arg1 == None):
+                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", " +  str(arg2) + "),\n"    
+            elif(self.isValidVariable(arg1)):
                 self.output +=  "\t"*self.blockLevel  +  "(assign, \":" + arg1 + "\", \"" +  str(arg2) + "\"),\n"            
-            if(arg1[0] == "$"):
+            elif(arg1[0] == "$"):
                 if(self.isValidVariable(arg1)):
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1 + "\", \"" +  str(arg2) + "\"),\n"
             
             #self.mathVars.pop()
             self.parentsLevel = 1
-        if(arg1 == None):            
+        if(arg1 == None and str(type(arg2)) != "<class 'lark.tree.Tree'>"):            
             if(str(self.lastVariableNameDeclared[1]) == "Number"):
                 if(isNumber(arg2)):
                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", " +  str(arg2) + "),\n"
@@ -460,7 +472,66 @@ class CalculateTree(Transformer):
                 else:
                     raise Exception( "COMPILER ERROR: " + self.lastVariableNameDeclared[0]  + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: boolean true or false" + ". At procedure/function " + self.currentProcedureName )
             else:
-                procedureName = arg2.children[0]
+                raise Exception("Not implemented")        
+        elif(str(type(arg2)) == "<class 'lark.tree.Tree'>"):
+            returnTypes = []
+            functionToCall = ""
+            paramsdeclares = []
+            if(self.currentProcedureName == str(arg2.children[0])):
+                functionToCall = self.currentProcedureName
+                returnTypes = self.returnTypes[:]
+                paramsdeclares = self.paramsdeclares[:]
+            else:
+                func = self.FindProcedureOrFunction(str(arg2.children[0]))
+                if(func == None):
+                    raise Exception( "COMPILER ERROR: Cannot find function " + str(arg2.children[0])  + 
+                                    ". \nIf this function is declared make sure it precedes this procedure/function. At procedure/function " + self.currentProcedureName )
+                functionToCall = func[0][:]                
+                paramsdeclares = func[1][:]
+                returnTypes = func[2][:]
+                if(len(returnTypes) == 0):
+                    raise Exception( "COMPILER ERROR: " + str(arg2.children[0])  + " is procedure, which does not return any value. At procedure/function " + self.currentProcedureName )
+
+            if(len(returnTypes) > 1):
+                print("WARNING, function " + functionToCall + " returned multiple result (" + str(len(returnTypes)) + ")")
+                self.append_warning("function " + functionToCall + " returned multiple result (" + str(len(returnTypes)) + ")")
+            if(str(self.lastVariableNameDeclared[1]) == returnTypes[0]):
+                self.output +=  "\t"*self.blockLevel  +  "(call_script, \"script_" + functionToCall + "\""
+                if(str(type(arg2.children[1])) == "<class 'lark.tree.Tree'>"):
+                    i = 0
+                    for call_arg in arg2.children[1].children:
+                        if( i >= len(paramsdeclares)):
+                            raise Exception( "COMPILER ERROR: Number of parameters passed to function " + str(arg2.children[0])  + " does not match. Required: " + str(len(paramsdeclares)) + ", paramater passed: " + str(i + 1) + ". At procedure/function " + self.currentProcedureName )
+                        if(isNumber(call_arg)):
+                            if(paramsdeclares[i][1] == "Number"):
+                                self.output += ", " + str(call_arg)
+                            else:
+                                raise Exception( "COMPILER ERROR: Parameter of function " + str(arg2.children[0])  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expect: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
+                        elif(isBooleanLiteral(call_arg)):
+                            if(paramsdeclares[i][1] == "Boolean"):                                    
+                                self.output += ", " + str(call_arg)
+                            else:
+                                raise Exception( "COMPILER ERROR: Parameter of function " + str(arg2.children[0])  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expect: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
+                        elif(self.isValidVariable(call_arg)):
+                            var = self.isValidVariable(call_arg)
+                            if(paramsdeclares[i][1] == var[1]):
+                                if(not IsLocalVariable(var[0])):
+                                    self.output += ", \"" + str(call_arg) + "\""
+                                else:
+                                    self.output += ", \":" + str(call_arg) + "\""
+                            else:
+                                raise Exception( "COMPILER ERROR: Parameter of function " + str(arg2.children[0])  + " is being assigned with incorrect data type. assigned value: " + str(call_arg) + ", expect: " + paramsdeclares[i][1] + ". At procedure/function " + self.currentProcedureName )
+                        i += 1
+                    if( i != len(paramsdeclares)):
+                        raise Exception( "COMPILER ERROR: Number of parameters passed to function " + str(arg2.children[0])  + " does not match. Required: " + str(len(paramsdeclares)) + ", paramater passed: " + str(i + 1) + ". At procedure/function " + self.currentProcedureName )
+                else:
+                    for call_arg in arg2.children[1:]:
+                        self.output += "," + str(call_arg)
+                self.output += "),\n"
+                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", reg0),\n"
+            else:
+                raise Exception( "COMPILER ERROR: " + self.lastVariableNameDeclared[0]  + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expect: function with return type "+ self.lastVariableNameDeclared[1] +". At procedure/function " + self.currentProcedureName )
+            procedureName = arg2.children[0]
         else:
             del self.literals[:]
             variable = self.isValidVariable(arg1)[1]
@@ -568,7 +639,8 @@ class CalculateTree(Transformer):
         print("begin!")
 
     def returnsdeclare(self, *args):
-        self.returnTypes.append(str(args[0]))
+        for ar in args:
+            self.returnTypes.append(str(ar))        
 
     def paramsdeclare(self, *args):
         self.append_comment("\t"*self.blockLevel + "#---parameter declarations begin---\n ")
@@ -595,6 +667,7 @@ class CalculateTree(Transformer):
         proc += self.output 
         proc += "]),"
         procedures.append(proc)
+        self.proceduresName[-1] = (self.currentProcedureName, self.paramsdeclares[:], [])
         self.blockLevel  =1 # clear every procedure
         self.output = "" # clear every procedure
         del self.mathVars[:] # clear every procedure
@@ -610,6 +683,7 @@ class CalculateTree(Transformer):
         proc += "(\"" + self.currentProcedureName  + "\",[\n"
         proc += self.output 
         proc += "]),"
+        self.proceduresName[-1] = (self.currentProcedureName, self.paramsdeclares[:] ,self.returnTypes[:])
         procedures.append(proc)
         self.blockLevel  =1 # clear every procedure
         self.output = "" # clear every procedure
@@ -623,9 +697,10 @@ class CalculateTree(Transformer):
 
     def procedure_name(self, arg1):
         self.currentProcedureName = str(arg1)
-        if(self.currentProcedureName in self.proceduresName):
-            raise Exception("COMPILER ERROR: redefinition of procedure/function " + self.currentProcedureName + " (it is already exist)")
-        self.proceduresName.append(self.currentProcedureName)
+        for s in self.proceduresName:
+            if(self.currentProcedureName == s[0]):
+                raise Exception("COMPILER ERROR: redefinition of procedure/function " + self.currentProcedureName + " (it is already exist)")
+        self.proceduresName.append((self.currentProcedureName, [] , []))
 
     def isValidVariable(self, var):
         var = str(var)
@@ -656,9 +731,18 @@ class CalculateTree(Transformer):
                 i += 1
         return proc
 
+    def FindProcedureOrFunction(self, name):
+        for n in self.proceduresName:
+            if(n[0] == name):
+                return n
+        return None
+
     def append_comment(self, text):
         if(DEBUG):
             self.output += text
+
+    def append_warning(self, text):
+        self.output += "# WARNING: " + text + "\n"
 
 
 
@@ -679,7 +763,6 @@ paramsdeclare : "("")"
 returnsdeclare  : "("")"
                 | "(" TYPE ")" 
 		        | "("  TYPE (","  TYPE)+ ")" 
-
 
 mainblock :     "begin""end"  
 				| "begin" (instruction)* "end" 
@@ -770,7 +853,7 @@ NAME: /\$?[A-Za-z][A-Za-z0-9_]*/
 NUMBER: /\d+\.?\d*/
 NUMBER_NEG: /\-\d+\.?\d*/
 STRING: /./
-TYPE: "Number" | "String" | "QString" | "Procedure" | "Boolean"
+TYPE: "Number" | "String" | "QString" | "Procedure" | "Function" | "Boolean"
     | "Faction" | "Presentation" | "Troop" | "Agent" | "Item" | "Array" | "DynamicArray"
 BOOL: "true"
 	| "false"
@@ -819,22 +902,38 @@ def test():
                 RelationFacB = -(9999 + -100);
             end
        end
-       function Factorial(Input: Number) : (Number)
+       
+       function Addition(abc: Number, bca: Number) : (Number)
        begin
-            if((not (Input >= 2)) and (not ( 1 != 2 ) )) then
-                x : Number = 4554;
+            output: Number = abc + bca;
+            result output;
+       end
+
+       function Addition2(abc: Number, bca: Number) : (Number, Number)
+       begin
+            output: Number = Addition(abc, bca) + Addition(abc, bca);
+            result output, output;
+       end
+       
+       function Factorial(Input: Number, Input2: Number, Input3: Number) : (Number)
+       begin
+            boolean: Boolean;
+            if((not (Input >= 2)) and (not ( 1 != 2 ) )) then 
+                x : Number = Addition2(12, -99);
                 result 23;
             end            
             result 1;
        end
 
-       
+      
     """
     
     tree = parser.parse(text)
     print(tree.pretty())
     print(str(procedures[0]))
     print(str(procedures[1]))
+    print(str(procedures[2]))
+    print(str(procedures[3]))
     #pydot__tree_to_png(tree, "output.png")
 
 if __name__ == '__main__':

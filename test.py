@@ -98,9 +98,9 @@ class CalculateTree(Transformer):
         self.output = "" # clear every procedure
         self.paramsdeclares = [] # clear every procedure
         self.returnTypes = []   # clear every procedure
-        
-        self.blockcondition = "" # clear every block
-        self.recursiveProcCall = "" # clear after recursion is done
+        self.loopIterators = []  # clear every procedure
+
+        self.blockcondition = "" # clear every block        
         self.returnRegCounter = 0 # clear every procedure
         self.neg = False
         self.enteredIf = False # clear every procedure
@@ -668,7 +668,7 @@ class CalculateTree(Transformer):
             self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
             self.enteredIf  = True
         elif(arg == None and self.else_if_counter > 0):
-            if(self.enteredLoop):
+            if(len(self.loopIterators) > 0):
                 self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
             else:
                 self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
@@ -698,6 +698,7 @@ class CalculateTree(Transformer):
         if(isVariable(self.lastAssignedValue)):
             self.lastAssignedValue = "\"" + self.lastAssignedValue + "\"" 
         self.output +=  "\t"*(self.blockLevel-1)+ "(try_for_range, \""+  str(self.lastAssignedVariable[0]) + "\", "+ self.lastAssignedValue + ", \xEE REPLACE \xEE),\n"
+        self.loopIterators.append(self.lastAssignedVariable[0])
 
     def beginblock(self, *args):
         tabs = "\t"*(self.blockLevel) if (self.enteredIf) else ""
@@ -719,11 +720,15 @@ class CalculateTree(Transformer):
         print("else!")
 
     def endblock(self, *args):
-        self.enteredLoop = False
         self.blockLevel -= 1
         self.output +=  "\t"*self.blockLevel+ "(try_end),\n" 
         self.else_if_counter = 0
         print("begin!")
+
+    def endloopfor(self, *args):
+        self.loopIterators.pop()
+        self.blockLevel -= 1
+        self.output +=  "\t"*self.blockLevel+ "(try_end),\n" 
 
     def returnsdeclare(self, *args):
         for ar in args:
@@ -755,14 +760,7 @@ class CalculateTree(Transformer):
         proc += "]),"
         procedures.append(proc)
         self.proceduresName[-1] = (self.currentProcedureName, self.paramsdeclares[:], [])
-        self.blockLevel  =1 # clear every procedure
-        self.output = "" # clear every procedure
-        del self.mathVars[:] # clear every procedure
-        del self.paramsdeclares[:] # clear every procedure
-        del self.vars[:] # clear every procedure
-        del self.returnTypes[:] # clear every procedure
-        self.returnRegCounter = 0 # clear every procedure
-        self.enteredIf = False # clear every procedure
+        self.reset()
         print("# procedure" + str(args))
 
     def function(self, *args):
@@ -772,15 +770,19 @@ class CalculateTree(Transformer):
         proc += "]),"
         self.proceduresName[-1] = (self.currentProcedureName, self.paramsdeclares[:] ,self.returnTypes[:])
         procedures.append(proc)
+        self.reset()
+        print("# function" + str(args))
+
+    def reset(self):
         self.blockLevel  =1 # clear every procedure
         self.output = "" # clear every procedure
         del self.mathVars[:] # clear every procedure
         del self.paramsdeclares[:] # clear every procedure
         del self.vars[:] # clear every procedure
         del self.returnTypes[:] # clear every procedure
+        del self.loopIterators[:]  # clear every procedure
         self.returnRegCounter = 0 # clear every procedure
         self.enteredIf = False # clear every procedure
-        print("# function" + str(args))
 
     def procedure_name(self, arg1):
         self.currentProcedureName = str(arg1)
@@ -872,6 +874,8 @@ mainblock :     "begin" "end"
 
 beginblock: "then"
 endblock: "end"
+endloopfor:  "end"
+endwhile: "end"
 else_if_try: "else" "if"
 else_try: "else"
 
@@ -880,9 +884,12 @@ test : "(" (expression | BOOL ) ")" -> test_expression
 
 for_loop_header: assignment  
 for_loop_end_cond: expression
-for_loop_body:  (instruction)*
+loop_body:  (instruction)*
 
-forstatement:  "for" for_loop_header "to" for_loop_end_cond "do" for_loop_body endblock 
+forstatement:  "for" for_loop_header "to" for_loop_end_cond "do" loop_body endloopfor 
+
+while_loop_header: expression
+whilestatement: "while" while_loop_header "do" loop_body endwhile
 
 ifstatement: if_body endblock 
             | if_body (try_else_if_body)+ (try_else_body)? endblock  -> else_if_block

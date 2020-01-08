@@ -151,6 +151,7 @@ class CalculateTree(Transformer):
                    raise Exception("unmatched param sign 2")
                 #self.output += ", " + "\"" + str(var[0]) + "\""
                 mathVars.append(var[0])
+                params.append(None)
             else:
                 var = self.isValidVariable(param)
                 if(var):
@@ -162,7 +163,7 @@ class CalculateTree(Transformer):
                     #
                     params.append(str(param))
                     #self.output += ", " +  str(param)  
-            params.append(None)
+            
             j += 1
         i = 0
         mathVars.sort(reverse = True)
@@ -890,8 +891,8 @@ def test():
             if((not (Input >= 2)) and not ( 1 != 2 ) ) then 
 //                                         -paren 6 (Input, -25, 50)-                                                             -paren 7 (Input, -25, 54545-
 //                                         |                         |                                                           |                            |
-                x : Number = Factorial(  Factorial( Input , -25 , -50), Input ,  Factorial( Input , 30 , Factorial( Input , -2 , Factorial( Input , -25 , 54545))));
-//                           |                                                   |                                  |----------paren 8 (Input, -2, paren7) ------| |
+                x : Number = Factorial(  Factorial( Input , -25 , -50), Input ,  Factorial( Input , 30 , Factorial( 2 , Input , Factorial( Input , -25 , 54545))));
+//                           |                                                   |                                  |----------paren 8 (2, Input, paren7) ------| |
 //                           |                                                   |-------------------  paren 9 (Input, 30, paren 8) -------------------------------|
 //                           |-------------------------------- paren 10 --(paren6, Input, paren 9)-----------------------------------------------------------------|
                 //$NUMBER, $NUMBER2 = Addition2(1,2,3);

@@ -98,7 +98,7 @@ class CalculateTree(Transformer):
         self.output = "" # clear every procedure
         self.paramsdeclares = [] # clear every procedure
         self.returnTypes = []   # clear every procedure
-        self.loopIterators = []  # clear every procedure
+        self.loopEndIterators = []  # clear every procedure
 
         self.blockcondition = "" # clear every block        
         self.returnRegCounter = 0 # clear every procedure
@@ -111,7 +111,7 @@ class CalculateTree(Transformer):
         self.lastAssignedValue = 0
         self.assignMultipleValueFromFunc = [] # clear every assigment
         self.proceduresName = []
-        self.fromFuncCall = True
+        
 
         self.advanceIndexInProcessFuncCall = 0 # will be incremented at op_process_func_call and reset at assigment
     def op_proc_call(self, arg, *args):
@@ -197,7 +197,7 @@ class CalculateTree(Transformer):
         #self.mathVars.sort(reverse = True)
 
         self.output += "\t"*self.blockLevel  + "(assign,\""+  self.mathVars[-1] +"\", reg0),\n"
-        self.fromFuncCall = True
+        
         #self.mathVars.pop()
         
     def op_func_call_mult_return(self, arg, args):
@@ -281,22 +281,21 @@ class CalculateTree(Transformer):
             self.output += "\t"*self.blockLevel  + "(assign,\""+  self.mathVars[-1 * i] +"\", reg"+ str(i) +"),\n"
             i += 1
         
-        self.fromFuncCall = True
+        
         
     ################################################  MATH OPERATIONS
     def op_add_sub(self, args1, args2 = None, op = "store_add"):
+        appendAssign = False
         if(args2 == None):
             args2 = "\"" + self.mathVars[-1] +  "\""
         if(args1 == None):
             if(len(self.mathVars) > 2):
                 args1 = "\"" + self.mathVars[-3] +  "\""
+            elif(len(self.mathVars) == 1):
+                args1 = "\"" + self.mathVars[-1] +  "\""
             else:
                 args1 = "\"" + self.mathVars[-2] +  "\""
 
-        if(isNumber(args1)):
-            args1 = str(args1)
-        elif(IsLocalVariable(args1)):
-            args1 = "\"" + self.isValidVariable(args1)[0] + "\""
 
         if(isNumber(args2)):
             args2 = str(args2)
@@ -305,10 +304,21 @@ class CalculateTree(Transformer):
         else:
             self.isValidVariable(args2)
             args2 = "\"" + args2 + "\""
+        
+        if(isNumber(args1)):
+            args1 = str(args1)
+        elif(IsLocalVariable(args1)):
+            args1 = "\"" + self.isValidVariable(args1)[0] + "\""
+        else:
+            self.isValidVariable(args1)
+            args1 = "\"" + args1 + "\""
+            appendAssign = True
 
         self.mathVars.append(":paren" + str(self.parentsLevel))
         self.parentsLevel += 1
         self.output += "\t"*self.blockLevel +  "(" + op + ", \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2)  + "),\n"
+        if(appendAssign):
+            self.output += "\t"*self.blockLevel +  "(assign, " +  str(args1) + ", \"" +  self.mathVars[-1] + "\"),\n"
 
     def op_mul_div_mod(self, args1, args2 = None, op = "store_mul"):
         arg2IsMathVar = False
@@ -567,13 +577,11 @@ class CalculateTree(Transformer):
                 arg2 = DecorateWithQuotes(str(arg2))
                 #self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", " +  str(arg2) + "),\n"    
             elif(self.isValidVariable(arg1)):
-                if (self.fromFuncCall):        
-                    self.fromFuncCall = False
-                    var = self.isValidVariable(arg1)
-                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  var[0] + "\", \"" + self.mathVars[-1] +"\"),\n" 
-                    self.lastAssignedVariable = var
-                    self.lastAssignedValue = self.mathVars[-1]
-                    del self.mathVars[:]
+                var = self.isValidVariable(arg1)
+                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  var[0] + "\", \"" + self.mathVars[-1] +"\"),\n" 
+                self.lastAssignedVariable = var
+                self.lastAssignedValue = self.mathVars[-1]
+                del self.mathVars[:]
         else:            
             self.parentsLevel = 1
             variable = self.isValidVariable(arg1)
@@ -668,7 +676,7 @@ class CalculateTree(Transformer):
             self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
             self.enteredIf  = True
         elif(arg == None and self.else_if_counter > 0):
-            if(len(self.loopIterators) > 0):
+            if(len(self.loopEndIterators) > 0):
                 self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
             else:
                 self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
@@ -685,20 +693,35 @@ class CalculateTree(Transformer):
     def for_loop_end_cond(self, arg):
         self.enteredLoop = True
         if(arg == None):
+            var = self.isValidVariable(self.mathVars[-1])
+            if(var[1] == "Boolean"):
+                raise Exception("cannot use boolean value here 1")
             self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"") 
+            self.loopEndIterators.append(self.mathVars[-1])
         else:
             var = self.isValidVariable(str(arg))
             if(var):
+                if(var[1] != self.lastAssignedVariable[1]):
+                    raise Exception("does not match")
+                elif(var[1] == "Boolean"):
+                    raise Exception("cannot use boolean value here 2")
+                self.loopEndIterators.append(var[0])
                 self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + str(var[0]) + "\"" ) 
             else:
-                self.output = self.output.replace("\xEE REPLACE \xEE", str(arg)) 
+                if(isBooleanLiteral(str(arg))):
+                    raise Exception("cannot use boolean value here 3")
+                self.mathVars.append(":paren" + str(self.parentsLevel))
+                self.parentsLevel += 1
+                self.output +=  "\t"*(self.blockLevel)+ "(assign, \""+  self.mathVars[-1] + "\", "+ str(arg) + "),\n"
+                self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"") 
+                self.loopEndIterators.append(self.mathVars[-1])
 
     def for_loop_header(self, *args):
         self.blockLevel += 1
         if(isVariable(self.lastAssignedValue)):
             self.lastAssignedValue = "\"" + self.lastAssignedValue + "\"" 
         self.output +=  "\t"*(self.blockLevel-1)+ "(try_for_range, \""+  str(self.lastAssignedVariable[0]) + "\", "+ self.lastAssignedValue + ", \xEE REPLACE \xEE),\n"
-        self.loopIterators.append(self.lastAssignedVariable[0])
+        
 
     def beginblock(self, *args):
         tabs = "\t"*(self.blockLevel) if (self.enteredIf) else ""
@@ -726,7 +749,7 @@ class CalculateTree(Transformer):
         print("begin!")
 
     def endloopfor(self, *args):
-        self.loopIterators.pop()
+        self.loopEndIterators.pop()
         self.blockLevel -= 1
         self.output +=  "\t"*self.blockLevel+ "(try_end),\n" 
 
@@ -780,7 +803,7 @@ class CalculateTree(Transformer):
         del self.paramsdeclares[:] # clear every procedure
         del self.vars[:] # clear every procedure
         del self.returnTypes[:] # clear every procedure
-        del self.loopIterators[:]  # clear every procedure
+        del self.loopEndIterators[:]  # clear every procedure
         self.returnRegCounter = 0 # clear every procedure
         self.enteredIf = False # clear every procedure
 
@@ -888,8 +911,8 @@ loop_body:  (instruction)*
 
 forstatement:  "for" for_loop_header "to" for_loop_end_cond "do" loop_body endloopfor 
 
-while_loop_header: expression
-whilestatement: "while" while_loop_header "do" loop_body endwhile
+while_header: "while" test "do" 
+whilestatement: while_header loop_body endwhile
 
 ifstatement: if_body endblock 
             | if_body (try_else_if_body)+ (try_else_body)? endblock  -> else_if_block
@@ -906,6 +929,7 @@ try_else_body: else_try (instruction)*
             | result ";"
             | ifstatement
             | forstatement
+            | whilestatement
             | procedure_expr ";" 
 
             
@@ -936,11 +960,11 @@ try_else_body: else_try (instruction)*
 		?atom: NUMBER         -> number
 			 | "-" atom       -> op_minus
 			 | "(" expression ")"
-             | "not" expression  -> op_neg
-             | variable
+             | "not" expression  -> op_neg             
              | function_expr 
              | NUMBER_NEG
              | BOOL
+             | variable
 
     ?function_retmultple_expr: variable params -> op_func_call_mult_return
 	?procedure_expr: variable params -> op_proc_call
@@ -992,7 +1016,7 @@ COMMENT     : "/*" /(.|\\n|\\r)+/ "*/"
 %ignore WS
 """
 
-parser = Lark(turtle_grammar, parser='lalr', transformer=CalculateTree(), debug=True)
+parser = Lark(turtle_grammar, parser='lalr', transformer=CalculateTree(), debug=False)
 
 
 
@@ -1006,74 +1030,17 @@ def main():
 
 def test():
     text = """
-       procedure CalculateFactionTension(RelationFacA : Number, RelationFacB: Number)
+       procedure CalculateFactionTension(LoopBegin : Number, RelationFacB: Number)
        begin
-            bool1: Boolean; bool2: Boolean; bool3: Boolean; bool4: Boolean;
-            array: Array;
             $GLOBAL2: Boolean;
             $GLOBAL: Number;
-            for RelationFacA = 1 to  RelationFacB - $GLOBAL  do
-                integer3: Number = -1;            
-                if(
-                    (bool1 or bool2) or not(
-                    (true and false) and (1 != 2))
-                  )
-                then
-                    Number123: Number;
-                    RelationFacA = -1 + RelationFacB * (RelationFacA * -100) * 2 + $GLOBAL * 100;
-                    Number123 = RelationFacA;
-                    if(true) then
-                        Number123  = 0;
-                    else if(Number123 != Number123) then
-                        Number123 = 9999 - 00;
-                    end
-                else if(bool2 or true and false) then
-                    RelationFacA = -0 + RelationFacB * (RelationFacA * -100) * 2;
-                else 
-                    RelationFacB = -9999;
-                    RelationFacB = -(9999 + -100);
-                end
+            $GLOBAL = 123 + $GLOBAL ;
+            for LoopBegin = 1 to  2 do
+              $GLOBAL = $GLOBAL + $GLOBAL + 99984949849;
             end
+
        end
        
-       function Addition(abc: Number, bca: Number) : (Number)
-       begin
-            output: Number = abc + bca;
-            result output;
-       end
-
-       function Addition2(abc: Number, bca: Number, x: Number) : (Number)
-       begin
-            output: Number = bca + abc + 3 * 40;
-            result output;
-            output = -1;
-       end
-
-       function ReturnMultipleResult(Input: Number, Input2: Number, Input3: Number) : (Number, Boolean) 
-       begin
-           integer: Number = 0;
-
-           result 1,false;
-       end
-       
-       function Factorial(Input: Number, Input2: Number, Input3: Number) : (Number)
-       begin
-            boolean: Boolean;
-            $NUMBER: Boolean = true;
-            $NUMBER2: Number = 2;
-            if((not (Input >= 2)) and not ( 1 != 2 ) ) then 
-//                                         -paren 6 (Input, -25, 50)-                                                             -paren 7 (Input, -25, 54545-
-//                                         |                         |                                                           |                            |
-                x : Number = Factorial(  Factorial( Input , -25 , -50), Input ,  Factorial( Input , 30 , Factorial( 2 , Input , Factorial( Input , -25 , 54545))));
-//                           |                                                   |                                  |----------paren 8 (2, Input, paren7) ------| |
-//                           |                                                   |-------------------  paren 9 (Input, 30, paren 8) -------------------------------|
-//                           |-------------------------------- paren 10 --(paren6, Input, paren 9)-----------------------------------------------------------------|
-                
-                $NUMBER2, $NUMBER = ReturnMultipleResult(1,Factorial( Input , Factorial( 21, Input , Input2), -50),3);
-                result x;
-            end            
-            result 1;
-       end
 
       
     """

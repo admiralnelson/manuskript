@@ -139,6 +139,7 @@ class CalculateTree(Transformer):
         j = 0
 
         mathVars = []
+        params = []
         for param in args.children:
             if(param == None):                
                #self.mathVars.sort(reverse  = True)
@@ -155,14 +156,28 @@ class CalculateTree(Transformer):
                 if(var):
                     if(paramSign[j][1] != var[1]):
                         raise Exception("unmatched param sign 3")
+                    params.append(var[0])
+                    #self.output += ", " + "\"" + str(var[0]) + "\""
+                else:
+                    #
+                    params.append(str(param))
+                    #self.output += ", " +  str(param)  
+            params.append(None)
+            j += 1
+        i = 0
+        mathVars.sort(reverse = True)
+        for v in params:
+            if (v != None):
+                var = self.isValidVariable(v)
+                if(var):
                     self.output += ", " + "\"" + str(var[0]) + "\""
                 else:
-                    self.output += ", " +  str(param)  
-            j += 1
-        mathVars.sort()
-        if(len(mathVars) > 0):
-            for v in mathVars:
-                self.output += ", " + "\"" + str(v) + "\""
+                    self.output += ", " + str(v) 
+            else:
+                if(len(mathVars) > 0 ):
+                    v = mathVars.pop()
+                    self.output += ", " + "\"" + str(v) + "\""
+
         self.output += "),\n"
 
         if(returnSign[0] == "Number"):
@@ -873,7 +888,12 @@ def test():
             //$NUMBER: Number = 1;
             //$NUMBER2: Number = 2;
             if((not (Input >= 2)) and not ( 1 != 2 ) ) then 
-                x : Number = Factorial( Input, Input ,  Factorial( Input , 30 , Factorial( Input , -2 , Factorial( Input , -25 , Factorial( Input , -25 , -50)))));                
+//                                         -paren 6 (Input, -25, 50)-                                                             -paren 7 (Input, -25, 54545-
+//                                         |                         |                                                           |                            |
+                x : Number = Factorial(  Factorial( Input , -25 , -50), Input ,  Factorial( Input , 30 , Factorial( Input , -2 , Factorial( Input , -25 , 54545))));
+//                           |                                                   |                                  |----------paren 8 (Input, -2, paren7) ------| |
+//                           |                                                   |-------------------  paren 9 (Input, 30, paren 8) -------------------------------|
+//                           |-------------------------------- paren 10 --(paren6, Input, paren 9)-----------------------------------------------------------------|
                 //$NUMBER, $NUMBER2 = Addition2(1,2,3);
                 result x;
             end            

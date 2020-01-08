@@ -722,6 +722,15 @@ class CalculateTree(Transformer):
             self.lastAssignedValue = "\"" + self.lastAssignedValue + "\"" 
         self.output +=  "\t"*(self.blockLevel-1)+ "(try_for_range, \""+  str(self.lastAssignedVariable[0]) + "\", "+ self.lastAssignedValue + ", \xEE REPLACE \xEE),\n"
         
+    def while_header(self, *args):
+        self.blockLevel += 1
+        if(isVariable(self.lastAssignedValue)):
+            self.lastAssignedValue = "\"" + self.lastAssignedValue + "\"" 
+        self.mathVars.append(":while_loop" + str(self.parentsLevel))
+        self.parentsLevel += 1
+        self.output +=  "\t"*(self.blockLevel-1)+ "(try_for_range, \""+  str(self.mathVars[-1]) + "\", 0, \xEE REPLACE \xEE),\n"
+        
+
 
     def beginblock(self, *args):
         tabs = "\t"*(self.blockLevel) if (self.enteredIf) else ""
@@ -1030,17 +1039,83 @@ def main():
 
 def test():
     text = """
-       procedure CalculateFactionTension(LoopBegin : Number, RelationFacB: Number)
+       procedure CalculateFactionTension(RelationFacA : Number, RelationFacB: Number)
        begin
+            bool1: Boolean; bool2: Boolean; bool3: Boolean; bool4: Boolean;
+            array: Array;
             $GLOBAL2: Boolean;
             $GLOBAL: Number;
-            $GLOBAL = 123 + $GLOBAL ;
-            for LoopBegin = 1 to  2 do
-              $GLOBAL = $GLOBAL + $GLOBAL + 99984949849;
+            for RelationFacA = 1 to  RelationFacB - $GLOBAL  do
+                integer3: Number = -1;            
+                if(
+                    (bool1 or bool2) or not(
+                    (true and false) and (1 != 2))
+                  )
+                then
+                    for RelationFacA = 1 to  100 do
+                        $GLOBAL = $GLOBAL * 2 + 1;
+                        while(true) do
+                            $GLOBAL = $GLOBAL + 1;
+                        end
+                    end
+                    Number123: Number;
+                    RelationFacA = -1 + RelationFacB * (RelationFacA * -100) * 2 + $GLOBAL * 100;
+                    Number123 = RelationFacA;
+                    if(true) then
+                        Number123  = 0;
+                    else if(Number123 != Number123) then
+                        Number123 = 9999 - 00;
+                    end
+                else if(bool2 or true and false) then
+                    RelationFacA = -0 + RelationFacB * (RelationFacA * -100) * 2;
+                else 
+                    RelationFacB = -9999;
+                    RelationFacB = -(9999 + -100);
+                end
             end
-
        end
        
+       function Addition(abc: Number, bca: Number) : (Number)
+       begin
+            output: Number = abc + bca;
+            result output;
+       end
+
+       function Addition2(abc: Number, bca: Number, x: Number) : (Number)
+       begin
+            output: Number = bca + abc + 3 * 40;
+            result output;
+            output = -1;
+       end
+
+       function ReturnMultipleResult(Input: Number, Input2: Number, Input3: Number) : (Number, Boolean) 
+       begin
+           integer: Number = 0;
+           for Input = 1 to  Input2  do
+                integer =  Addition2(integer, Input, Input2); 
+           end
+           result 1,false;
+       end
+       
+       function Factorial(Input: Number, Input2: Number, Input3: Number) : (Number)
+       begin
+            boolean: Boolean;
+            $NUMBER: Boolean = true;
+            $NUMBER2: Number = 2;
+            if((not (Input >= 2)) and not ( 1 != 2 ) ) then 
+//                                         -paren 6 (Input, -25, 50)-                                                             -paren 7 (Input, -25, 54545-
+//                                         |                         |                                                           |                            |
+                x : Number = Factorial(  Factorial( Input , -25 , -50), Input ,  Factorial( Input , 30 , Factorial( 2 , Input , Factorial( Input , -25 , 54545))));
+//                           |                                                   |                                  |----------paren 8 (2, Input, paren7) ------| |
+//                           |                                                   |-------------------  paren 9 (Input, 30, paren 8) -------------------------------|
+//                           |-------------------------------- paren 10 --(paren6, Input, paren 9)-----------------------------------------------------------------|
+                
+                $NUMBER2, $NUMBER = ReturnMultipleResult(1,Factorial( Input , Factorial( 21, Input , Input2), -50),3);
+                result x;
+            end            
+            result 1;
+       end
+
 
       
     """
@@ -1048,10 +1123,10 @@ def test():
     tree = parser.parse(text)
     print(tree.pretty())
     print(str(procedures[0]))
-    #print(str(procedures[1]))
-    #print(str(procedures[2]))
-    #print(str(procedures[3]))
-    #print(str(procedures[4]))
+    print(str(procedures[1]))
+    print(str(procedures[2]))
+    print(str(procedures[3]))
+    print(str(procedures[4]))
     #pydot__tree_to_png(tree, "output.png")
 
 if __name__ == '__main__':

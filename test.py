@@ -109,13 +109,54 @@ class CalculateTree(Transformer):
         self.proceduresName = []
 
         self.advanceIndexInProcessFuncCall = 0 # will be incremented at op_process_func_call and reset at assigment
-    #def procedure(self, *args):
-        #print "procedure " + str(args)
-    def op_func_call(self, arg):
-        self.output += "\t"*self.blockLevel +  "(call_script, \"" +  str(arg.children[0]) 
-        for var in arg.children[1].children:
-            self.output += "," +  str(var)  
-        self.output += ")\n"
+    def op_proc_call(self, arg, *args):
+        var = self.isValidVariable(arg)
+        self.output += "\t"*self.blockLevel +  "(call_script, \"" +  str(var[0])  + "\", " + str(args)  + " ),\n"
+
+    def op_func_call(self, arg, args):
+        procedureSign = self.FindProcedureOrFunction(arg)
+        paramSign =  []
+        returnSign = []
+        if(procedureSign == None):
+            raise Exception("proc not found")
+        elif(procedureSign[0] == self.currentProcedureName):
+            paramSign  = self.paramsdeclares
+            returnSign  = self.returnTypes
+        else:
+            paramSign =  procedureSign[1]
+            returnSign = procedureSign[2]
+
+        if(len(paramSign) != len(args.children)):
+            raise Exception("unmatched param sign")
+        if(len(returnSign ) == 0):
+            raise Exception("is a procedure")
+        if(len(returnSign ) > 1):
+            raise Exception("function returns multiple result")
+
+        self.output += "\t"*self.blockLevel +  "(call_script, \"script_" +  str(arg)  + "\""
+
+        i = 0 # must be advanced
+        j = 0
+        for param in args.children:
+            if(param == None):
+                var = self.mathVars[i] 
+                var = self.isValidVariable(var)
+                i += 1                
+                if(paramSign[j][1] != var[1]):
+                   raise Exception("unmatched param sign 2")
+                self.output += ", " + "\"" + str(var[0]) + "\""
+            else:
+                var = self.isValidVariable(param)
+                if(var):
+                    if(paramSign[j][1] != var[1]):
+                        raise Exception("unmatched param sign 3")
+                    self.output += ", " + "\"" + str(var[0]) + "\""
+                else:
+                    self.output += ", " +  str(param)  
+            j += 1
+            
+        self.output += "),\n"        
+        #self.output += "\t"*self.blockLevel  + "(assign,\""+ self.lastVariableNameDeclared[0] +"\", reg0),\n"
 
     ################################################  MATH OPERATIONS
     def op_add_sub(self, args1, args2 = None, op = "store_add"):
@@ -369,7 +410,7 @@ class CalculateTree(Transformer):
             self.mathVars.pop()
         print("# expr " +  str(arg1))
     
-    def assignment(self, arg1, arg2=None):
+    def assignment(self, arg1, arg2=None, *args):
         vars = dict(self.vars)
         if(arg1 == None):
             arg1 = self.lastVariableNameDeclared[0]
@@ -379,16 +420,26 @@ class CalculateTree(Transformer):
                 arg2 = DecorateWithQuotes(str(arg2))
                 #self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", " +  str(arg2) + "),\n"    
             elif(self.isValidVariable(arg1)):
-                self.output +=  "\t"*self.blockLevel  +  "(assign, \":" + arg1 + "\", \"" +  str(arg2) + "\"),\n"            
-            elif(arg1[0] == "$"):
-                if(self.isValidVariable(arg1)):
-                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1 + "\", \"" +  str(arg2) + "\"),\n"
+                pass
+                #self.output +=  "\t"*self.blockLevel  +  "(assign, \":" + arg1 + "\", \"" +  str(arg2) + "\"),\n"                        
+        else:            
             self.parentsLevel = 1
-            if(arg2 == None):                
-                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", " +  self.mathVars[-1] + "),\n"
-            elif(self.isValidVariable(arg2)):
-                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", " +  arg2 + "),\n"
-            elif(variable=="Boolean"):
+            variable = self.isValidVariable(arg1)
+            variable2 = self.isValidVariable(arg2)
+            arg1 = variable[0]
+            if(variable2):
+                arg2 = variable2[0]
+            if(arg2 == None):
+                if(len(self.mathVars) > 0 ):
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", " +  self.mathVars[-1] + "),\n"
+                else:
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", " + str(0) + "),\n"
+            elif(variable2):
+                if(variable[1] == variable2[1]):
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", \"" +  arg2 + "\"),\n"
+                else:
+                    raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: " + variable[1] + ". At procedure/function " + self.currentProcedureName )                                
+            elif(variable[1]=="Boolean"):
                 if str(arg2) == "true":
                     self.append_comment("\t"*self.blockLevel+  "# "+ str(arg1) + " := true (1) " + "\n")
                     arg2 = 1
@@ -397,7 +448,8 @@ class CalculateTree(Transformer):
                     arg2 = 0
                 else: 
                     raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: boolean true or false" + ". At procedure/function " + self.currentProcedureName )                                
-            elif(variable=="Number"):
+                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", " +  arg2 + "),\n"
+            elif(variable[1]=="Number"):
                 self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", " +  str(arg2) + "),\n"
                 if(not isNumber(arg2)):
                     raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: Numeric" + ". At procedure/function " + self.currentProcedureName )
@@ -559,7 +611,12 @@ class CalculateTree(Transformer):
         for v in self.mathVars:
             if("\"" + v + "\"" == var): return (v, self.InternalVariable(v))
             if( v == var): return (v, self.InternalVariable(v))
-        if var in self.proceduresName: return var
+        for proc in self.proceduresName: 
+            if(var == proc[0]):
+                if(len(proc[2]) > 0):
+                    return  ("script_" + var, "Function")
+                else:
+                    return  ("script_" + var, "Procedure")
         raise Exception( "COMPILER ERROR: undefined " + var + " for local variable. At procedure/function " + self.currentProcedureName)
         
 
@@ -616,7 +673,9 @@ returnsdeclare  : "("")"
                 | "(" TYPE ")" 
 		        | "("  TYPE (","  TYPE)+ ")" 
 
-mainblock :     "begin""end"  
+
+mainblock :     "begin" "end"  
+                |"begin" NEWLINE*  "end"  
 				| "begin" (instruction)* "end" 
 
 beginblock: "then"
@@ -639,7 +698,7 @@ try_else_body: else_try (instruction)*
             | exitprocedure ";"
             | result ";"
             | ifstatement
-            | procedure_expr ";"
+            | procedure_expr ";" 
 
             
 
@@ -671,11 +730,11 @@ try_else_body: else_try (instruction)*
 			 | "(" expression ")"
              | "not" expression  -> op_neg
              | variable
-             | function_expr -> op_func_call
+             | function_expr 
              | NUMBER_NEG
 
-	?procedure_expr: variable params
-    ?function_expr: variable params 
+	?procedure_expr: variable params -> op_proc_call
+    ?function_expr: variable params -> op_func_call
 		?params:  "("")" 
 			| "(" variable ")" 
 			| "(" variable ("," variable)+ ")" 
@@ -689,6 +748,9 @@ return_expression: procedure_call_name | (NUMBER_NEG | NUMBER )
 
 ?assignment: variable "=" expression
            | variabledeclare "=" expression 
+           | multiple_assignment "=" function_expr 
+
+multiple_assignment : variable ("," variable)+
 //           | variabledeclare "=" STRING 
 //           | variable "=" STRING 
 
@@ -705,14 +767,18 @@ procedure_call_name : NAME
 NAME: /\$?[A-Za-z][A-Za-z0-9_]*/
 NUMBER: /\d+\.?\d*/
 NUMBER_NEG: /\-\d+\.?\d*/
+NEWLINE: /\\n|\\r/
 STRING: /./
 TYPE: "Number" | "String" | "QString" | "Procedure" | "Function" | "Boolean"
     | "Faction" | "Presentation" | "Troop" | "Agent" | "Item" | "Array" | "DynamicArray"
 BOOL: "true"
 	| "false"
 
-
- %import common.WS
+COMMENT     : "/*" /(.|\\n|\\r)+/ "*/"  
+             |  "//" /(.)+(\\n|\\r)/ 
+ 
+%ignore COMMENT 
+%import common.WS
 %ignore WS
 """
 
@@ -734,7 +800,10 @@ def test():
        begin
             bool1: Boolean = bool1; bool2: Boolean; bool3: Boolean; bool4: Boolean = bool3;
             array: Array;
+            $GLOBAL2: Boolean;
             $GLOBAL: Number;
+            $GLOBAL = -1;
+            $GLOBAL = $GLOBAL;
             if(
                 (bool1 or bool2) or not(
                 (true and false) and (1 != 2))
@@ -762,17 +831,26 @@ def test():
             result output;
        end
 
-       function Addition2(abc: Number, bca: Number, x: Number) : (Number, Number)
+       function Addition2(abc: Number, bca: Number, x: Number) : (Number)
        begin
             output: Number = bca + abc + 3 * 40;
-            result output, output;
+            result output;
+            output = -1;
+       end
+
+       procedure Pass_a_procedure(proc: Procedure, func: Function) 
+       begin
+           proc(1,2,3);
        end
        
        function Factorial(Input: Number, Input2: Number, Input3: Number) : (Number)
        begin
             boolean: Boolean;
-            if((not (Input >= 2)) and (not ( 1 != 2 ) )) then 
-                x : Number = 0;                
+            //$NUMBER: Number = 1;
+            //$NUMBER2: Number = 2;
+            if((not (Input >= 2)) and not ( 1 != 2 ) ) then 
+                x : Number = Factorial(Factorial(1+2,3,3+1),2,3+3);                
+                //$NUMBER, $NUMBER2 = Addition2(1,2,3);
                 result x;
             end            
             result 1;
@@ -787,6 +865,7 @@ def test():
     print(str(procedures[1]))
     print(str(procedures[2]))
     print(str(procedures[3]))
+    print(str(procedures[4]))
     #pydot__tree_to_png(tree, "output.png")
 
 if __name__ == '__main__':

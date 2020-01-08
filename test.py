@@ -302,6 +302,9 @@ class CalculateTree(Transformer):
             args2 = str(args2)
         elif(IsLocalVariable(args2)):
             args2 = "\"" + self.isValidVariable(args2)[0] + "\""
+        else:
+            self.isValidVariable(args2)
+            args2 = "\"" + args2 + "\""
 
         self.mathVars.append(":paren" + str(self.parentsLevel))
         self.parentsLevel += 1
@@ -694,7 +697,7 @@ class CalculateTree(Transformer):
         self.blockLevel += 1
         if(isVariable(self.lastAssignedValue)):
             self.lastAssignedValue = "\"" + self.lastAssignedValue + "\"" 
-        self.output +=  "\t"*(self.blockLevel-1)+ "(try_for_range, \""+  str(self.lastAssignedVariable[0]) + "\", "+ self.lastAssignedValue + ", \xEE REPLACE \xEE) \n"
+        self.output +=  "\t"*(self.blockLevel-1)+ "(try_for_range, \""+  str(self.lastAssignedVariable[0]) + "\", "+ self.lastAssignedValue + ", \xEE REPLACE \xEE),\n"
 
     def beginblock(self, *args):
         tabs = "\t"*(self.blockLevel) if (self.enteredIf) else ""
@@ -1002,7 +1005,7 @@ def test():
             array: Array;
             $GLOBAL2: Boolean;
             $GLOBAL: Number;
-            for RelationFacA = 1 to  RelationFacB  do
+            for RelationFacA = 1 to  RelationFacB - $GLOBAL  do
                 integer3: Number = -1;            
                 if(
                     (bool1 or bool2) or not(

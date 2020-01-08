@@ -104,6 +104,7 @@ class CalculateTree(Transformer):
         self.returnRegCounter = 0 # clear every procedure
         self.neg = False
         self.enteredIf = False # clear every procedure
+        self.enteredLoop = False
         self.currentProcedureName = ""
         self.lastVariableNameDeclared = () # clear every assigment
         self.lastAssignedVariable = ()  # clear every assigment
@@ -661,10 +662,13 @@ class CalculateTree(Transformer):
 
     def test_expression(self, arg):
         if(arg == None and self.else_if_counter == 0):
-            self.blockcondition = "\t"*(self.blockLevel ) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+            self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
             self.enteredIf  = True
         elif(arg == None and self.else_if_counter > 0):
-            self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+            if(self.enteredLoop):
+                self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+            else:
+                self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
         else:
             if arg == "true":
                 self.blockcondition = "\t"*(self.blockLevel + 1) +  "(eq, 1,1), \n"
@@ -675,11 +679,16 @@ class CalculateTree(Transformer):
     def else_if_block(self, *args):
         pass
     
-    def for_loop_end_cond(self, arg):        
+    def for_loop_end_cond(self, arg):
+        self.enteredLoop = True
         if(arg == None):
             self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"") 
         else:
-            self.output = self.output.replace("\xEE REPLACE \xEE", str(arg)) 
+            var = self.isValidVariable(str(arg))
+            if(var):
+                self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + str(var[0]) + "\"" ) 
+            else:
+                self.output = self.output.replace("\xEE REPLACE \xEE", str(arg)) 
 
     def for_loop_header(self, *args):
         self.blockLevel += 1
@@ -707,8 +716,9 @@ class CalculateTree(Transformer):
         print("else!")
 
     def endblock(self, *args):
+        self.enteredLoop = False
         self.blockLevel -= 1
-        self.output +=  "\t"*self.blockLevel+ "(try_end),\n\n" 
+        self.output +=  "\t"*self.blockLevel+ "(try_end),\n" 
         self.else_if_counter = 0
         print("begin!")
 
@@ -992,27 +1002,27 @@ def test():
             array: Array;
             $GLOBAL2: Boolean;
             $GLOBAL: Number;
-            for RelationFacA = 1 to 50 + 50 * RelationFacA  do
-                integer3: Number = -1;
-            end
-            if(
-                (bool1 or bool2) or not(
-                (true and false) and (1 != 2))
-              )
-            then
-                Number123: Number;
-                RelationFacA = -1 + RelationFacB * (RelationFacA * -100) * 2 + $GLOBAL * 100;
-                Number123 = RelationFacA;
-                if(true) then
-                    Number123  = 0;
-                else if(Number123 != Number123) then
-                    Number123 = 9999 - 00;
+            for RelationFacA = 1 to  RelationFacB  do
+                integer3: Number = -1;            
+                if(
+                    (bool1 or bool2) or not(
+                    (true and false) and (1 != 2))
+                  )
+                then
+                    Number123: Number;
+                    RelationFacA = -1 + RelationFacB * (RelationFacA * -100) * 2 + $GLOBAL * 100;
+                    Number123 = RelationFacA;
+                    if(true) then
+                        Number123  = 0;
+                    else if(Number123 != Number123) then
+                        Number123 = 9999 - 00;
+                    end
+                else if(bool2 or true and false) then
+                    RelationFacA = -0 + RelationFacB * (RelationFacA * -100) * 2;
+                else 
+                    RelationFacB = -9999;
+                    RelationFacB = -(9999 + -100);
                 end
-            else if(bool2 or true and false) then
-                RelationFacA = -0 + RelationFacB * (RelationFacA * -100) * 2;
-            else 
-                RelationFacB = -9999;
-                RelationFacB = -(9999 + -100);
             end
        end
        

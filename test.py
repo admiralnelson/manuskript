@@ -107,6 +107,7 @@ class CalculateTree(Transformer):
         self.currentProcedureName = ""
         self.lastVariableNameDeclared = () # clear every assigment
         self.proceduresName = []
+        self.fromFuncCall = True
 
         self.advanceIndexInProcessFuncCall = 0 # will be incremented at op_process_func_call and reset at assigment
     def op_proc_call(self, arg, *args):
@@ -135,16 +136,20 @@ class CalculateTree(Transformer):
 
         self.output += "\t"*self.blockLevel +  "(call_script, \"script_" +  str(arg)  + "\""
 
-        i = 0 # must be advanced
         j = 0
+
+        mathVars = []
         for param in args.children:
-            if(param == None):
-                var = self.mathVars[i] 
+            if(param == None):                
+               #self.mathVars.sort(reverse  = True)
+                var = self.mathVars[-1]
                 var = self.isValidVariable(var)
-                i += 1                
+                self.mathVars.pop()
+                
                 if(paramSign[j][1] != var[1]):
                    raise Exception("unmatched param sign 2")
-                self.output += ", " + "\"" + str(var[0]) + "\""
+                #self.output += ", " + "\"" + str(var[0]) + "\""
+                mathVars.append(var[0])
             else:
                 var = self.isValidVariable(param)
                 if(var):
@@ -154,9 +159,27 @@ class CalculateTree(Transformer):
                 else:
                     self.output += ", " +  str(param)  
             j += 1
-            
-        self.output += "),\n"        
-        #self.output += "\t"*self.blockLevel  + "(assign,\""+ self.lastVariableNameDeclared[0] +"\", reg0),\n"
+        mathVars.sort()
+        if(len(mathVars) > 0):
+            for v in mathVars:
+                self.output += ", " + "\"" + str(v) + "\""
+        self.output += "),\n"
+
+        if(returnSign[0] == "Number"):
+            self.mathVars.append(":paren" + str(self.parentsLevel) )
+            self.parentsLevel += 1
+        elif(returnSign[0] == "Boolean"):
+            self.mathVars.append(":bgroup" + str(self.parentsLevel))
+            self.parentsLevel += 1
+        elif(returnSign[0] == "Array"):
+            self.mathVars.append(":tarray" + str(self.parentsLevel) )
+            self.parentsLevel += 1
+        #self.mathVars.sort(reverse = True)
+
+        self.output += "\t"*self.blockLevel  + "(assign,\""+  self.mathVars[-1] +"\", reg0),\n"
+        self.fromFuncCall = True
+        #self.mathVars.pop()
+        
 
     ################################################  MATH OPERATIONS
     def op_add_sub(self, args1, args2 = None, op = "store_add"):
@@ -420,8 +443,11 @@ class CalculateTree(Transformer):
                 arg2 = DecorateWithQuotes(str(arg2))
                 #self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.lastVariableNameDeclared[0]   + "\", " +  str(arg2) + "),\n"    
             elif(self.isValidVariable(arg1)):
-                pass
-                #self.output +=  "\t"*self.blockLevel  +  "(assign, \":" + arg1 + "\", \"" +  str(arg2) + "\"),\n"                        
+                if (self.fromFuncCall):        
+                    self.fromFuncCall = False
+                    var = self.isValidVariable(arg1)
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  var[0] + "\", \"" + self.mathVars[-1] +"\"),\n" 
+                    del self.mathVars[:]
         else:            
             self.parentsLevel = 1
             variable = self.isValidVariable(arg1)
@@ -736,8 +762,6 @@ try_else_body: else_try (instruction)*
 	?procedure_expr: variable params -> op_proc_call
     ?function_expr: variable params -> op_func_call
 		?params:  "("")" 
-			| "(" variable ")" 
-			| "(" variable ("," variable)+ ")" 
 			| "(" expression ")" 
 			| "(" expression ("," expression)+ ")" 
 
@@ -762,7 +786,7 @@ variabledeclare: NAME ":" TYPE
 indexing: variable "[" sum "]"  
 
 ?variable : NAME
-procedure_call_name : NAME
+procedure_call_name : variable
 
 NAME: /\$?[A-Za-z][A-Za-z0-9_]*/
 NUMBER: /\d+\.?\d*/
@@ -849,7 +873,7 @@ def test():
             //$NUMBER: Number = 1;
             //$NUMBER2: Number = 2;
             if((not (Input >= 2)) and not ( 1 != 2 ) ) then 
-                x : Number = Factorial(Factorial(1+2,3,3+1),2,3+3);                
+                x : Number = Factorial( Input, Input ,  Factorial( Input , 30 , Factorial( Input , -2 , Factorial( Input , -25 , Factorial( Input , -25 , -50)))));                
                 //$NUMBER, $NUMBER2 = Addition2(1,2,3);
                 result x;
             end            

@@ -106,6 +106,8 @@ class CalculateTree(Transformer):
         self.enteredIf = False # clear every procedure
         self.currentProcedureName = ""
         self.lastVariableNameDeclared = () # clear every assigment
+        self.lastAssignedVariable = ()  # clear every assigment
+        self.lastAssignedValue = 0
         self.assignMultipleValueFromFunc = [] # clear every assigment
         self.proceduresName = []
         self.fromFuncCall = True
@@ -325,8 +327,12 @@ class CalculateTree(Transformer):
             if(not isVariable(args2)): raise Exception( "COMPILER ERROR: undefined " + args2 + " for local or global variable!")
         
         self.mathVars.append(":paren" + str(self.parentsLevel))
-        self.parentsLevel += 1
-        self.output += "\t"*self.blockLevel +  "(" + op +", \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2)  + "),\n"
+        self.parentsLevel += 1        
+        if(self.isValidVariable(args2)):
+            var2 = self.isValidVariable(args2)[0]
+            self.output += "\t"*self.blockLevel +  "(" + op +", \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", \"" + str(var2)  + "\"),\n"
+        else:
+            self.output += "\t"*self.blockLevel +  "(" + op +", \"" +  self.mathVars[-1]  + "\", " +  str(args1)+ ", " + str(args2)  + "),\n"
 
     def op_minus(self, arg1):
         if(arg1 == None):
@@ -540,6 +546,7 @@ class CalculateTree(Transformer):
             self.assignMultipleValueFromFunc.append(arg)
     
     def assignment(self, arg1, arg2=None, *args):
+        
         vars = dict(self.vars)
         if(len(self.assignMultipleValueFromFunc) > 0):
             i = 0
@@ -560,6 +567,8 @@ class CalculateTree(Transformer):
                     self.fromFuncCall = False
                     var = self.isValidVariable(arg1)
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  var[0] + "\", \"" + self.mathVars[-1] +"\"),\n" 
+                    self.lastAssignedVariable = var
+                    self.lastAssignedValue = self.mathVars[-1]
                     del self.mathVars[:]
         else:            
             self.parentsLevel = 1
@@ -571,11 +580,20 @@ class CalculateTree(Transformer):
             if(arg2 == None):
                 if(len(self.mathVars) > 0 ):
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", " +  self.mathVars[-1] + "),\n"
+                    var = self.isValidVariable(arg1)
+                    self.lastAssignedVariable = var
+                    self.lastAssignedValue = self.mathVars[-1]
                 else:
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", " + str(0) + "),\n"
+                    var = self.isValidVariable(arg1)
+                    self.lastAssignedVariable = var
+                    self.lastAssignedValue = str(0)
             elif(variable2):
                 if(variable[1] == variable2[1]):
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", \"" +  arg2 + "\"),\n"
+                    var = self.isValidVariable(arg1)
+                    self.lastAssignedVariable = var
+                    self.lastAssignedValue = arg2 
                 else:
                     raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: " + variable[1] + ". At procedure/function " + self.currentProcedureName )                                
             elif(variable[1]=="Boolean"):
@@ -588,12 +606,21 @@ class CalculateTree(Transformer):
                 else: 
                     raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: boolean true or false" + ". At procedure/function " + self.currentProcedureName )                                
                 self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", " +  str(arg2) + "),\n"
+                var = self.isValidVariable(arg1)
+                self.lastAssignedVariable = var 
+                self.lastAssignedValue = str(arg2)
             elif(variable[1]=="Number"):
                 self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", " +  str(arg2) + "),\n"
+                var = self.isValidVariable(arg1)
+                self.lastAssignedVariable = var 
+                self.lastAssignedValue = str(arg2)
                 if(not isNumber(arg2)):
                     raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: Numeric" + ". At procedure/function " + self.currentProcedureName )
             else:
                 self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", \":" +  str(arg2) + "\"),\n"
+                var = self.isValidVariable(arg1)
+                self.lastAssignedVariable = var 
+                self.lastAssignedValue = str(arg2)
 
 
     def variabledeclare(self, arg1, arg2):
@@ -647,6 +674,18 @@ class CalculateTree(Transformer):
 
     def else_if_block(self, *args):
         pass
+    
+    def for_loop_end_cond(self, arg):        
+        if(arg == None):
+            self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"") 
+        else:
+            self.output = self.output.replace("\xEE REPLACE \xEE", str(arg)) 
+
+    def for_loop_header(self, *args):
+        self.blockLevel += 1
+        if(isVariable(self.lastAssignedValue)):
+            self.lastAssignedValue = "\"" + self.lastAssignedValue + "\"" 
+        self.output +=  "\t"*(self.blockLevel-1)+ "(try_for_range, \""+  str(self.lastAssignedVariable[0]) + "\", "+ self.lastAssignedValue + ", \xEE REPLACE \xEE) \n"
 
     def beginblock(self, *args):
         tabs = "\t"*(self.blockLevel) if (self.enteredIf) else ""
@@ -825,6 +864,13 @@ else_try: "else"
 
 test : "(" (expression | BOOL ) ")" -> test_expression
 
+
+for_loop_header: assignment  
+for_loop_end_cond: expression
+for_loop_body:  (instruction)*
+
+forstatement:  "for" for_loop_header "to" for_loop_end_cond "do" for_loop_body endblock 
+
 ifstatement: if_body endblock 
             | if_body (try_else_if_body)+ (try_else_body)? endblock  -> else_if_block
 
@@ -832,12 +878,14 @@ ifstatement: if_body endblock
 if_body: "if" test beginblock (instruction)*
 try_else_if_body : else_if_try test "then" (instruction)* 
 try_else_body: else_try (instruction)* 
+
      
 ?instruction: assignment ";"
             | variabledeclare ";"
             | exitprocedure ";"
             | result ";"
             | ifstatement
+            | forstatement
             | procedure_expr ";" 
 
             
@@ -940,12 +988,13 @@ def test():
     text = """
        procedure CalculateFactionTension(RelationFacA : Number, RelationFacB: Number)
        begin
-            bool1: Boolean = bool1; bool2: Boolean; bool3: Boolean; bool4: Boolean = bool3;
+            bool1: Boolean; bool2: Boolean; bool3: Boolean; bool4: Boolean;
             array: Array;
             $GLOBAL2: Boolean;
             $GLOBAL: Number;
-            $GLOBAL = -1;
-            $GLOBAL = $GLOBAL;
+            for RelationFacA = 1 to 50 + 50 * RelationFacA  do
+                integer3: Number = -1;
+            end
             if(
                 (bool1 or bool2) or not(
                 (true and false) and (1 != 2))
@@ -982,6 +1031,8 @@ def test():
 
        function ReturnMultipleResult(Input: Number, Input2: Number, Input3: Number) : (Number, Boolean) 
        begin
+           integer: Number = 0;
+
            result 1,false;
        end
        
@@ -1010,10 +1061,10 @@ def test():
     tree = parser.parse(text)
     print(tree.pretty())
     print(str(procedures[0]))
-    print(str(procedures[1]))
-    print(str(procedures[2]))
-    print(str(procedures[3]))
-    print(str(procedures[4]))
+    #print(str(procedures[1]))
+    #print(str(procedures[2]))
+    #print(str(procedures[3]))
+    #print(str(procedures[4]))
     #pydot__tree_to_png(tree, "output.png")
 
 if __name__ == '__main__':

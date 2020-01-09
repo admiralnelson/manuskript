@@ -34,7 +34,7 @@ reservedKeywords = [
         
     ]
 
-DEBUG = False
+DEBUG = True
 
 BOOLEAN = 1
 NUMBER = 2
@@ -698,6 +698,8 @@ class CalculateTree(Transformer):
                 raise Exception("cannot use boolean value here 1")
             self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"") 
             self.loopEndIterators.append(self.mathVars[-1])
+            self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
+            self.append_comment("\t"*(self.blockLevel) + "# -- loop header end\n")
         else:
             var = self.isValidVariable(str(arg))
             if(var):
@@ -707,19 +709,27 @@ class CalculateTree(Transformer):
                     raise Exception("cannot use boolean value here 2")
                 self.loopEndIterators.append(var[0])
                 self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + str(var[0]) + "\"" ) 
+                self.output = self.output.replace("\n\t"*(self.blockLevel - 1)+"\xEE REPLACE2 \xEE", "\n" ) 
+                self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + str(var[0])  + "\"),\n"
+                self.append_comment("\t"*(self.blockLevel) + "# -- loop header end\n")
             else:
                 if(isBooleanLiteral(str(arg))):
                     raise Exception("cannot use boolean value here 3")
                 self.mathVars.append(":paren" + str(self.parentsLevel))
+                self.output = self.output.replace("\xEE REPLACE2 \xEE", "(assign, \"" + self.mathVars[-1] + "\", 99999999),\n") 
                 self.parentsLevel += 1
                 self.output +=  "\t"*(self.blockLevel)+ "(assign, \""+  self.mathVars[-1] + "\", "+ str(arg) + "),\n"
-                self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"") 
+                self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"")                 
                 self.loopEndIterators.append(self.mathVars[-1])
+                self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
+                self.append_comment("\t"*(self.blockLevel) + "# -- loop header end\n")
 
     def for_loop_header(self, *args):
         self.blockLevel += 1
         if(isVariable(self.lastAssignedValue)):
             self.lastAssignedValue = "\"" + self.lastAssignedValue + "\"" 
+        self.append_comment("\t"*(self.blockLevel - 1) + "# -- loop header begin\n")
+        self.output +=  "\t"*(self.blockLevel - 1)+ "\xEE REPLACE2 \xEE"
         self.output +=  "\t"*(self.blockLevel-1)+ "(try_for_range, \""+  str(self.lastAssignedVariable[0]) + "\", "+ self.lastAssignedValue + ", \xEE REPLACE \xEE),\n"
         
     def while_header(self, *args):
@@ -729,6 +739,7 @@ class CalculateTree(Transformer):
         self.mathVars.append(":while_loop" + str(self.parentsLevel))
         self.parentsLevel += 1
         self.output +=  "\t"*(self.blockLevel-1)+ "(try_for_range, \""+  str(self.mathVars[-1]) + "\", 0, \xEE REPLACE \xEE),\n"
+
         
 
 
@@ -1045,6 +1056,9 @@ def test():
             array: Array;
             $GLOBAL2: Boolean;
             $GLOBAL: Number;
+            for $GLOBAL = 0 to 10 + 5 * 9 do
+                RelationFacA  = $GLOBAL;
+            end
             for RelationFacA = 1 to  RelationFacB - $GLOBAL  do
                 integer3: Number = -1;            
                 if(

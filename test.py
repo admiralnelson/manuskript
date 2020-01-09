@@ -412,6 +412,7 @@ class CalculateTree(Transformer):
             else: args2 = "\":"+ args2 + "\""
             self.append_comment("\t"*self.blockLevel +  "# ---- boolean3: \":"+ args1 +"\" or "+ str(args2)  +"\n")
             self.output += "\t"*(self.blockLevel) +  "(store_or, \""+ self.mathVars[-1]  +"\", \":"+ args1  +"\", " + str(args2) +"),\n"
+        
         #print str(args1) + " second args " + str(args2)
 
     def op_and(self, args1, args2 = None):
@@ -442,8 +443,12 @@ class CalculateTree(Transformer):
                 self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-3] +"\n")
                 self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + self.mathVars[-3]  +"\"),\n"
             else:
-                self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-4] +"\n")
-                self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + self.mathVars[-4]  +"\"),\n"
+                if(len(self.mathVars) > 3):
+                    self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-4] +"\n")
+                    self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + self.mathVars[-4]  +"\"),\n"
+                else:
+                    self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-3] +"\n")
+                    self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + self.mathVars[-3]  +"\"),\n"
         elif(args1 != None and args2 == None):
             self.mathVars.append(":bgroup" + str(self.parentsLevel))
             self.parentsLevel += 1
@@ -458,7 +463,7 @@ class CalculateTree(Transformer):
             elif(args2 == "false"): args2 = 0
             else: args2 = "\":"+ args2 + "\""
             self.append_comment("\t"*self.blockLevel +  "# ---- boolean3: \""+ args1 +"\" and "+ str(args2)  +"\n")
-            self.output += "\t"*(self.blockLevel) +  "(store_and, \""+ self.mathVars[-1]  +"\", \":"+ args1  +"\", " + str(args2) +"),\n"
+            self.output += "\t"*(self.blockLevel) +  "(store_and, \""+ self.mathVars[-1]  +"\", \":"+ args1  +"\", " + str(args2) +"),\n"        
         #print str(args1) + " second args " + str(args2)
 
     def op_neq_gt_lt_le_ge_eq(self, arg1, arg2, op = "neq"):        
@@ -477,12 +482,16 @@ class CalculateTree(Transformer):
 
         if(isNumber(arg2)): self.output += str(arg2)
         else: 
-            if(str(arg2[0] != '$')):
+            if (arg2 == None):
+                var  = self.mathVars[-1]
+                self.output += "\"" + var  + "\""
+            elif(str(arg2[0] != '$')):
                 self.output += "\":" + str(arg2) + "\""
         self.output += "),\n"
         self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
         self.output += "\t"*self.blockLevel +  "(try_end),\n"
         self.append_comment("\t"*self.blockLevel +  "# ---- end ---\n")
+
 
     def op_neg(self, arg1):
         if(arg1 == None):
@@ -498,6 +507,8 @@ class CalculateTree(Transformer):
             self.output += "\t"*((self.blockLevel)+1) +  "(eq, \"" +  self.mathVars[-2] + "\", 0),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
             self.output += "\t"*self.blockLevel +  "(try_end),\n"
+            if(self.enteredIf):
+                self.output += "ENTERED IF 3"
 
         else:
             if(str(arg1) == "false") : arg1 = 0
@@ -514,6 +525,7 @@ class CalculateTree(Transformer):
             self.output += "\t"*((self.blockLevel)+1) +  "(eq, " +  str(arg1) + ", 0),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
             self.output += "\t"*self.blockLevel +  "(try_end),\n"
+
 
 
     def op_neq(self, arg1, arg2):        
@@ -673,18 +685,18 @@ class CalculateTree(Transformer):
 
     def test_expression(self, arg):
         if(arg == None and self.else_if_counter == 0):
-            self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+            self.blockcondition = "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
             self.enteredIf  = True
         elif(arg == None and self.else_if_counter > 0):
             if(len(self.loopEndIterators) > 0):
-                self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+                self.blockcondition = "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
             else:
-                self.blockcondition = "\t"*(self.blockLevel - 1) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+                self.blockcondition = "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
         else:
             if arg == "true":
-                self.blockcondition = "\t"*(self.blockLevel + 1) +  "(eq, 1,1), \n"
+                self.blockcondition = "(eq, 1,1), \n"
             elif arg == "false":
-                self.blockcondition = "\t"*(self.blockLevel + 1) +  "(eq, 1,0), \n"
+                self.blockcondition =  "(eq, 1,0), \n"
         del self.mathVars[:]
 
     def else_if_block(self, *args):
@@ -744,22 +756,26 @@ class CalculateTree(Transformer):
 
 
     def beginblock(self, *args):
-        tabs = "\t"*(self.blockLevel) if (self.enteredIf) else ""
-        self.blockLevel += 1       
-        self.output +=  "\t"*(self.blockLevel-1)+ "(try_begin),\n" + tabs + self.blockcondition
+        if(self.enteredIf):
+            self.else_if_counter += 1
+        if( self.else_if_counter > 1):
+            self.append_comment("\t"*(self.blockLevel) + "# -- here up to try_else was test expression \n")            
+        else:
+            self.append_comment("\t"*(self.blockLevel) + "# -- here up to try_begin was test expression \n")                        
+            
+        self.output += "\t"*(self.blockLevel) + self.blockcondition
+        self.append_comment("\t"*(self.blockLevel) + "# -- if/else if header ends here \n")
         self.blockcondition = ""
-        self.enteredIf = False
-        print("begin!")
 
-    def else_if_try(self, *args):
-        self.else_if_counter += 1
-        self.output +=  "\t"*(self.blockLevel-1)+ "(else_try),\n" + self.blockcondition
-        self.blockcondition = ""
-        print("else!")
+    def if_try (self, *args):
+        if(self.else_if_counter == 0):
+            self.blockLevel += 1
+            self.output +=  "\t"*(self.blockLevel-1)+ "(try_begin),\n"
+            self.enteredIf = True
 
-    def else_try(self, *args):
-        self.else_if_counter += 1
+    def else_try(self, *args):  
         self.output +=  "\t"*(self.blockLevel-1)+ "(else_try),\n" 
+        self.append_comment("\t"*(self.blockLevel) + "# -- else \n")
         print("else!")
 
     def endblock(self, *args):
@@ -919,7 +935,8 @@ beginblock: "then"
 endblock: "end"
 endloopfor:  "end"
 endwhile: "end"
-else_if_try: "else" "if"
+if_try : "if"
+else_if_try: else_try if_try
 else_try: "else"
 
 test : "(" (expression | BOOL ) ")" -> test_expression
@@ -938,8 +955,8 @@ ifstatement: if_body endblock
             | if_body (try_else_if_body)+ (try_else_body)? endblock  -> else_if_block
 
 
-if_body: "if" test beginblock (instruction)*
-try_else_if_body : else_if_try test "then" (instruction)* 
+if_body: if_try  test beginblock (instruction)*
+try_else_if_body : else_if_try test beginblock (instruction)* 
 try_else_body: else_try (instruction)* 
 
      
@@ -1056,79 +1073,16 @@ def test():
             array: Array;
             $GLOBAL2: Boolean;
             $GLOBAL: Number;
-            for $GLOBAL = 0 to 10 + 5 * 9 do
-                RelationFacA  = $GLOBAL;
-            end
-            for RelationFacA = 1 to  RelationFacB - $GLOBAL  do
-                integer3: Number = -1;            
-                if(
-                    (bool1 or bool2) or not(
-                    (true and false) and (1 != 2))
-                  )
-                then
-                    for RelationFacA = 1 to  100 do
-                        $GLOBAL = $GLOBAL * 2 + 1;
-                        while(true) do
-                            $GLOBAL = $GLOBAL + 1;
-                        end
-                    end
-                    Number123: Number;
-                    RelationFacA = -1 + RelationFacB * (RelationFacA * -100) * 2 + $GLOBAL * 100;
-                    Number123 = RelationFacA;
-                    if(true) then
-                        Number123  = 0;
-                    else if(Number123 != Number123) then
-                        Number123 = 9999 - 00;
-                    end
-                else if(bool2 or true and false) then
-                    RelationFacA = -0 + RelationFacB * (RelationFacA * -100) * 2;
-                else 
-                    RelationFacB = -9999;
-                    RelationFacB = -(9999 + -100);
-                end
+            if(2 < 1 + 3+ 4 + 5 * $GLOBAL and $GLOBAL2) then
+                $GLOBAL = 1;
+            else if (false) then
+                $GLOBAL = 1;
+            else
+                $GLOBAL = -1;
             end
        end
-       
-       function Addition(abc: Number, bca: Number) : (Number)
-       begin
-            output: Number = abc + bca;
-            result output;
-       end
 
-       function Addition2(abc: Number, bca: Number, x: Number) : (Number)
-       begin
-            output: Number = bca + abc + 3 * 40;
-            result output;
-            output = -1;
-       end
-
-       function ReturnMultipleResult(Input: Number, Input2: Number, Input3: Number) : (Number, Boolean) 
-       begin
-           integer: Number = 0;
-           for Input = 1 to  Input2  do
-                integer =  Addition2(integer, Input, Input2); 
-           end
-           result 1,false;
-       end
        
-       function Factorial(Input: Number, Input2: Number, Input3: Number) : (Number)
-       begin
-            boolean: Boolean;
-            $NUMBER: Boolean = true;
-            $NUMBER2: Number = 2;
-            if((not (Input >= 2)) and not ( 1 != 2 ) ) then 
-//                                         -paren 6 (Input, -25, 50)-                                                             -paren 7 (Input, -25, 54545-
-//                                         |                         |                                                           |                            |
-                x : Number = Factorial(  Factorial( Input , -25 , -50), Input ,  Factorial( Input , 30 , Factorial( 2 , Input , Factorial( Input , -25 , 54545))));
-//                           |                                                   |                                  |----------paren 8 (2, Input, paren7) ------| |
-//                           |                                                   |-------------------  paren 9 (Input, 30, paren 8) -------------------------------|
-//                           |-------------------------------- paren 10 --(paren6, Input, paren 9)-----------------------------------------------------------------|
-                
-                $NUMBER2, $NUMBER = ReturnMultipleResult(1,Factorial( Input , Factorial( 21, Input , Input2), -50),3);
-                result x;
-            end            
-            result 1;
-       end
 
 
       
@@ -1137,10 +1091,7 @@ def test():
     tree = parser.parse(text)
     print(tree.pretty())
     print(str(procedures[0]))
-    print(str(procedures[1]))
-    print(str(procedures[2]))
-    print(str(procedures[3]))
-    print(str(procedures[4]))
+
     #pydot__tree_to_png(tree, "output.png")
 
 if __name__ == '__main__':

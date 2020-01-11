@@ -31,7 +31,7 @@ reservedKeywords = [
         "or",
         "and",
         "not",
-        
+        "break",
     ]
 
 DEBUG = True
@@ -88,7 +88,6 @@ class CalculateTree(Transformer):
     def __init__(self):
         self.mathVars = [] # clear every assigment or expression check
         self.parentsLevel = 1 # clear every assigment  or expression check
-        self.else_if_counter = 0# pop element if if statment is terminated
 
         self.globals = []
         self.vars = [] 
@@ -103,7 +102,7 @@ class CalculateTree(Transformer):
         self.blockcondition = "" # clear every block        
         self.returnRegCounter = 0 # clear every procedure
         self.neg = False
-        self.enteredIf = False # clear every procedure
+        
         self.enteredLoop = False
         self.currentProcedureName = ""
         self.lastVariableNameDeclared = () # clear every assigment
@@ -290,7 +289,7 @@ class CalculateTree(Transformer):
             args2 = "\"" + self.mathVars[-1] +  "\""
         if(args1 == None):
             if(len(self.mathVars) > 2):
-                args1 = "\"" + self.mathVars[-3] +  "\""
+                args1 = "\"" + self.mathVars[-2] +  "\""
             elif(len(self.mathVars) == 1):
                 args1 = "\"" + self.mathVars[-1] +  "\""
             else:
@@ -439,7 +438,13 @@ class CalculateTree(Transformer):
             self.parentsLevel += 1            
             b = 0
             if(args2 == "true"): b = 1
-            if(self.parentsLevel % 2 > 0):
+            if(args2 != None and self.isValidVariable(str(args2))):
+                var = self.isValidVariable(str(args2))
+                if(var[1] != "Boolean"):
+                    raise Exeception("invalid data type")
+                self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ str(args2) +"\n")
+                self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + str(args2)  +"\"),\n"
+            elif(self.parentsLevel % 2 > 0):
                 self.append_comment("\t"*self.blockLevel +  "# ---- boolean4: "+ self.mathVars[-2] +" and "+ self.mathVars[-3] +"\n")
                 self.output += "\t"*(self.blockLevel) +  "(store_and,\""+ self.mathVars[-1]  +"\" ,\""+ self.mathVars[-2]  +"\", \"" + self.mathVars[-3]  +"\"),\n"
             else:
@@ -469,14 +474,25 @@ class CalculateTree(Transformer):
     def op_neq_gt_lt_le_ge_eq(self, arg1, arg2, op = "neq"):        
         self.mathVars.append(":bgroup" + str(self.parentsLevel))
         self.parentsLevel += 1
-        self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" "+ op + " "+ str(arg2) +"\n")
-        self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
-        self.output += "\t"*self.blockLevel +  "(try_begin),\n"
-        self.output += "\t"*((self.blockLevel)+1) +  "("+ op +"," 
-        if(isNumber(arg1)): self.output += str(arg1)
-        else: 
-            if(str(arg1[0] != '$')):
-                self.output += "\":" + str(arg1) + "\""
+        if(arg1 == None and arg2 == None):
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ self.mathVars[-1] +" "+ op + " "+ self.mathVars[-2] +"\n")
+            self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
+            self.output += "\t"*self.blockLevel +  "(try_begin),\n"
+            self.output += "\t"*((self.blockLevel)+1) +  "("+ op +",\"" + self.mathVars[-2] + "\", \""+ self.mathVars[-3] + "\"),\n"
+            self.output += "\t"*((self.blockLevel)+1)  +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
+            self.output += "\t"*self.blockLevel +  "(try_end),\n"
+            return
+        else:
+            self.append_comment("\t"*self.blockLevel +  "# ---- boolean: "+ str(arg1) +" "+ op + " "+ str(arg2) +"\n")
+            self.output += "\t"*self.blockLevel +  "(assign, \""+ self.mathVars[-1]  + "\", 0),\n"
+            self.output += "\t"*self.blockLevel +  "(try_begin),\n"
+            self.output += "\t"*((self.blockLevel)+1) +  "("+ op +"," 
+            if(isNumber(arg1)): self.output += str(arg1)
+            else: 
+                if( arg1 != None and str(arg1[0] != '$')):
+                    self.output += "\":" + str(arg1) + "\""
+                else:
+                    self.output += "\"" + self.mathVars[-1] + "\""
         
         self.output += ","
 
@@ -506,9 +522,7 @@ class CalculateTree(Transformer):
             self.output += "\t"*self.blockLevel +  "(try_else),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(eq, \"" +  self.mathVars[-2] + "\", 0),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
-            self.output += "\t"*self.blockLevel +  "(try_end),\n"
-            if(self.enteredIf):
-                self.output += "ENTERED IF 3"
+            self.output += "\t"*self.blockLevel +  "(try_end),\n"            
 
         else:
             if(str(arg1) == "false") : arg1 = 0
@@ -544,12 +558,20 @@ class CalculateTree(Transformer):
     ################################################  BOOLEAN OPERATIONS END
     def return_expression(self, arg):
         if(isNumber(arg)):
+            if(self.returnTypes[self.returnRegCounter] != "Number"):
+                raise Exception("invalid return argument 1")
             self.output += "\t"*self.blockLevel +  "(assign, reg"+ str(self.returnRegCounter) +", " + str(arg)  + "),\n"
         elif(isBooleanLiteral(str(arg.children[0]))):
+            if(self.returnTypes[self.returnRegCounter] != "Boolean"):
+                raise Exception("invalid return argument 2")
+            arg = str(arg.children[0])
             self.output += "\t"*self.blockLevel +  "(assign, reg"+ str(self.returnRegCounter) +", " + str(ConvertBooleanLiteralToNumeric(arg))  + "),\n"
         else:            
-            var = self.isValidVariable(str(arg.children[0]))[0]
-            self.output += "\t"*self.blockLevel +  "(assign, reg"+ str(self.returnRegCounter) +", \"" + str(var)  + "\"),\n"
+            var = self.isValidVariable(str(arg.children[0]))
+            if(self.returnTypes[self.returnRegCounter] != var[1]):
+                raise Exception("invalid return argument 3")
+            self.output += "\t"*self.blockLevel +  "(assign, reg"+ str(self.returnRegCounter) +", \"" + str(var[0])  + "\"),\n"
+
         self.returnRegCounter += 1
 
     def result(self, *args):
@@ -684,19 +706,15 @@ class CalculateTree(Transformer):
         #print "# block " + str(args)
 
     def test_expression(self, arg):
-        if(arg == None and self.else_if_counter == 0):
-            self.blockcondition = "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
-            self.enteredIf  = True
-        elif(arg == None and self.else_if_counter > 0):
-            if(len(self.loopEndIterators) > 0):
-                self.blockcondition = "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
-            else:
-                self.blockcondition = "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+        if(arg == None):
+            self.output += "\t"*(self.blockLevel) + "(eq, \"" + self.mathVars[-1] + "\", 1), \n"
+                        
         else:
             if arg == "true":
-                self.blockcondition = "(eq, 1,1), \n"
+                self.output += "\t"*(self.blockLevel) +  "(eq, 1,1), \n"
             elif arg == "false":
-                self.blockcondition =  "(eq, 1,0), \n"
+                self.output += "\t"*(self.blockLevel) +   "(eq, 1,0), \n"
+        self.append_comment("\t"*(self.blockLevel) + "# -- end of if/else test expression\n")
         del self.mathVars[:]
 
     def else_if_block(self, *args):
@@ -708,8 +726,12 @@ class CalculateTree(Transformer):
             var = self.isValidVariable(self.mathVars[-1])
             if(var[1] == "Boolean"):
                 raise Exception("cannot use boolean value here 1")
+            self.mathVars.append(":floop" + str(self.parentsLevel))
+            self.parentsLevel += 1
+            self.loopEndIterators.append((self.mathVars[-1], str(self.lastAssignedVariable[0])  , "for"))
+            self.output = self.output.replace("\xEE REPLACE2 \xEE", "(assign, \"" + self.mathVars[-1] + "\", 99999999),\n")      
             self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"") 
-            self.loopEndIterators.append(self.mathVars[-1])
+            self.output +=  "\t"*(self.blockLevel)+ "(assign, \""+  self.mathVars[-1] + "\", \""+ self.mathVars[-2]  + "\"),\n"
             self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
             self.append_comment("\t"*(self.blockLevel) + "# -- loop header end\n")
         else:
@@ -718,23 +740,28 @@ class CalculateTree(Transformer):
                 if(var[1] != self.lastAssignedVariable[1]):
                     raise Exception("does not match")
                 elif(var[1] == "Boolean"):
-                    raise Exception("cannot use boolean value here 2")
-                self.loopEndIterators.append(var[0])
-                self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + str(var[0]) + "\"" ) 
+                    raise Exception("cannot use boolean value here 2")                
+                self.mathVars.append(":floop" + str(self.parentsLevel))
+                self.parentsLevel += 1
+                self.loopEndIterators.append((self.mathVars[-1], str(self.lastAssignedVariable[0]) , "for"))
+                self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"" ) 
                 self.output = self.output.replace("\n\t"*(self.blockLevel - 1)+"\xEE REPLACE2 \xEE", "\n" ) 
-                self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + str(var[0])  + "\"),\n"
+                self.output += "\t"*(self.blockLevel)+ "(assign, \""+  self.mathVars[-1] + "\", \""+ str(var[0]) + "\" ),\n"
+                self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
                 self.append_comment("\t"*(self.blockLevel) + "# -- loop header end\n")
             else:
                 if(isBooleanLiteral(str(arg))):
                     raise Exception("cannot use boolean value here 3")
-                self.mathVars.append(":paren" + str(self.parentsLevel))
-                self.output = self.output.replace("\xEE REPLACE2 \xEE", "(assign, \"" + self.mathVars[-1] + "\", 99999999),\n") 
+                self.mathVars.append(":floop" + str(self.parentsLevel))
                 self.parentsLevel += 1
+                self.output = self.output.replace("\xEE REPLACE2 \xEE", "(assign, \"" + self.mathVars[-1] + "\", 99999999),\n")                 
                 self.output +=  "\t"*(self.blockLevel)+ "(assign, \""+  self.mathVars[-1] + "\", "+ str(arg) + "),\n"
                 self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"")                 
-                self.loopEndIterators.append(self.mathVars[-1])
+                self.loopEndIterators.append((self.mathVars[-1],  str(self.lastAssignedVariable[0]), "for"))
                 self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
                 self.append_comment("\t"*(self.blockLevel) + "# -- loop header end\n")
+        if("\xEE REPLACE2 \xEE" in self.output):
+            print("assaas")
 
     def for_loop_header(self, *args):
         self.blockLevel += 1
@@ -743,12 +770,26 @@ class CalculateTree(Transformer):
         self.append_comment("\t"*(self.blockLevel - 1) + "# -- loop header begin\n")
         self.output +=  "\t"*(self.blockLevel - 1)+ "\xEE REPLACE2 \xEE"
         self.output +=  "\t"*(self.blockLevel-1)+ "(try_for_range, \""+  str(self.lastAssignedVariable[0]) + "\", "+ self.lastAssignedValue + ", \xEE REPLACE \xEE),\n"
+
+    def loop_break(self):
+        if(len(self.loopEndIterators) == 0):
+            raise Exception("cannot use break outside loop")
+        iteratorEnd  = self.loopEndIterators[-1]
+        self.append_comment("\t"*(self.blockLevel) + "# -- break header begin\n")
+        self.output +=  "\t"*(self.blockLevel) + "(assign, \"" + iteratorEnd[0] + "\", \""+ iteratorEnd[1] +"\" ),\n" 
+        if(iteratorEnd[2] == "reverse_for"):
+            self.output +=  "\t"*(self.blockLevel) + "(val_add, \"" + iteratorEnd[0] + "\", 1 ),\n" 
+        else:
+            self.output +=  "\t"*(self.blockLevel) + "(val_sub, \"" + iteratorEnd[0] + "\", 1 ),\n" 
+        self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[0] + "\", \""+ iteratorEnd[1]  +"\"),\n"
+        self.append_comment("\t"*(self.blockLevel) + "# -- break header end\n")
+        
         
     def while_header(self, *args):
         self.blockLevel += 1
         if(isVariable(self.lastAssignedValue)):
             self.lastAssignedValue = "\"" + self.lastAssignedValue + "\"" 
-        self.mathVars.append(":while_loop" + str(self.parentsLevel))
+        self.mathVars.append(":while_loop" + str(self.blockLevel))
         self.parentsLevel += 1
         self.output +=  "\t"*(self.blockLevel-1)+ "(try_for_range, \""+  str(self.mathVars[-1]) + "\", 0, \xEE REPLACE \xEE),\n"
 
@@ -756,32 +797,51 @@ class CalculateTree(Transformer):
 
 
     def beginblock(self, *args):
-        if(self.enteredIf):
-            self.else_if_counter += 1
-        if( self.else_if_counter > 1):
-            self.append_comment("\t"*(self.blockLevel) + "# -- here up to try_else was test expression \n")            
-        else:
-            self.append_comment("\t"*(self.blockLevel) + "# -- here up to try_begin was test expression \n")                        
-            
-        self.output += "\t"*(self.blockLevel) + self.blockcondition
-        self.append_comment("\t"*(self.blockLevel) + "# -- if/else if header ends here \n")
-        self.blockcondition = ""
+        pass
+        
+        
 
     def if_try (self, *args):
-        if(self.else_if_counter == 0):
-            self.blockLevel += 1
-            self.output +=  "\t"*(self.blockLevel-1)+ "(try_begin),\n"
-            self.enteredIf = True
+        #if(self.else_if_counter == 0):
+        self.blockLevel += 1
+        self.output +=  "\t"*(self.blockLevel-1)+ "(try_begin),\n"
+        if(len(self.loopEndIterators) > 0):
+            iteratorEnd  = self.loopEndIterators[-1]
+            self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
+            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[0] + "\", \""+ iteratorEnd[1]  +"\"),\n"
+            self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
+        self.append_comment("\t"*(self.blockLevel) + "# -- if header \n")
+        
+
+        
+    def else_if_try(self, *args):  
+        self.output +=  "\t"*(self.blockLevel-1)+ "(else_try),\n" 
+        if(len(self.loopEndIterators) > 0):
+            iteratorEnd  = self.loopEndIterators[-1]
+            self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
+            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[0] + "\", \""+ iteratorEnd[1]  +"\"),\n"
+            self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
+        self.append_comment("\t"*(self.blockLevel) + "# -- else if header \n")
+        print("else!")
 
     def else_try(self, *args):  
         self.output +=  "\t"*(self.blockLevel-1)+ "(else_try),\n" 
-        self.append_comment("\t"*(self.blockLevel) + "# -- else \n")
+        if(len(self.loopEndIterators) > 0):
+            iteratorEnd  = self.loopEndIterators[-1]
+            self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
+            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[0] + "\", \""+ iteratorEnd[1]  +"\"),\n"
+            self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
+        self.append_comment("\t"*(self.blockLevel) + "# -- else header \n")
         print("else!")
 
     def endblock(self, *args):
         self.blockLevel -= 1
-        self.output +=  "\t"*self.blockLevel+ "(try_end),\n" 
-        self.else_if_counter = 0
+        self.output +=  "\t"*self.blockLevel+ "(try_end),\n"
+        if(len(self.loopEndIterators) > 0):
+            iteratorEnd  = self.loopEndIterators[-1]
+            self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
+            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[0] + "\", \""+ iteratorEnd[1]  +"\"),\n"
+            self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
         print("begin!")
 
     def endloopfor(self, *args):
@@ -841,7 +901,7 @@ class CalculateTree(Transformer):
         del self.returnTypes[:] # clear every procedure
         del self.loopEndIterators[:]  # clear every procedure
         self.returnRegCounter = 0 # clear every procedure
-        self.enteredIf = False # clear every procedure
+        
 
     def procedure_name(self, arg1):
         self.currentProcedureName = str(arg1)
@@ -897,6 +957,7 @@ class CalculateTree(Transformer):
     def InternalVariable(self, name):
         if(name.startswith(":bgroup")): return "Boolean"
         if(name.startswith(":paren")): return "Number"
+        if(name.startswith(":floop")): return "Number"
         return False
 
     def append_comment(self, text):
@@ -936,15 +997,16 @@ endblock: "end"
 endloopfor:  "end"
 endwhile: "end"
 if_try : "if"
-else_if_try: else_try if_try
+else_if_try: "elseif"
 else_try: "else"
 
 test : "(" (expression | BOOL ) ")" -> test_expression
 
 
+loop_break : "break"
 for_loop_header: assignment  
 for_loop_end_cond: expression
-loop_body:  (instruction)*
+loop_body:  (instruction)* 
 
 forstatement:  "for" for_loop_header "to" for_loop_end_cond "do" loop_body endloopfor 
 
@@ -968,7 +1030,7 @@ try_else_body: else_try (instruction)*
             | forstatement
             | whilestatement
             | procedure_expr ";" 
-
+            | loop_break ";"
             
 
 ?expression :  bool_or
@@ -982,8 +1044,8 @@ try_else_body: else_try (instruction)*
             | comp  ">=" sum -> op_ge 
             | comp  "==" sum -> op_eq 
             | comp  "<=" sum -> op_le 
-            | comp  "<" sum -> op_gt 
-            | comp  ">" sum -> op_lt
+            | comp  ">" sum -> op_gt 
+            | comp  "<" sum -> op_lt
 		    | comp  "!=" sum -> op_neq
 
 		?sum: product
@@ -1072,25 +1134,66 @@ def test():
             bool1: Boolean; bool2: Boolean; bool3: Boolean; bool4: Boolean;
             array: Array;
             $GLOBAL2: Boolean;
-            $GLOBAL: Number;
-            if(2 < 1 + 3+ 4 + 5 * $GLOBAL and $GLOBAL2) then
-                $GLOBAL = 1;
-            else if (false) then
-                $GLOBAL = 1;
-            else
-                $GLOBAL = -1;
+            $GLOBAL: Number = 100;
+            for $GLOBAL = RelationFacA to 10 + 5 * 9 do
+                RelationFacA  = $GLOBAL;
             end
+            
        end
-
        
-
-
-      
+       function Addition(abc: Number, bca: Number) : (Number)
+       begin
+            output: Number = abc + bca;
+            result output;
+       end
+       function Addition2(abc: Number, bca: Number, x: Number) : (Number)
+       begin
+            output: Number = bca + abc + 3 * 40;
+            result output;
+            output = -1;
+       end
+       function ReturnMultipleResult(Input: Number, Input2: Number, Input3: Number) : (Number, Boolean) 
+       begin
+           integer: Number = 0;
+           $GLOBAL_INT: Number = 100;
+           for Input = integer to  Input2 + $GLOBAL_INT  do
+                integer =  Addition2(integer, Input, Input2); 
+                if(integer > 2) then
+                    break;
+                end
+                integer = Addition(1, integer);
+           end
+           result 1, false;
+       end
+       
+       function Factorial(Input: Number, Input2: Number, Input3: Number) : (Number)
+       begin
+            boolean: Boolean;
+            $NUMBER: Boolean = true;
+            $NUMBER2: Number = 2;
+            if((not (Input >= 2)) and not ( 1 != 2 ) ) then 
+//                                         -paren 6 (Input, -25, 50)-                                                             -paren 7 (Input, -25, 54545-
+//                                         |                         |                                                           |                            |
+                x : Number = Factorial(  Factorial( Input , -25 , -50), Input ,  Factorial( Input , 30 , Factorial( 2 , Input , Factorial( Input , -25 , 54545))));
+//                           |                                                   |                                  |----------paren 8 (2, Input, paren7) ------| |
+//                           |                                                   |-------------------  paren 9 (Input, 30, paren 8) -------------------------------|
+//                           |-------------------------------- paren 10 --(paren6, Input, paren 9)-----------------------------------------------------------------|
+                
+                $NUMBER2, $NUMBER = ReturnMultipleResult(1,Factorial( Input , Factorial( 21, Input , Input2), -50),3);
+                result x;
+            end            
+            result 1;
+       end
+ 
     """
     
     tree = parser.parse(text)
     print(tree.pretty())
     print(str(procedures[0]))
+    #print(str(procedures[1]))
+    #print(str(procedures[2]))
+    print(str(procedures[3]))
+    #print(str(procedures[4]))
 
     #pydot__tree_to_png(tree, "output.png")
 

@@ -366,6 +366,8 @@ class CalculateTree(Transformer):
         self.op_mul_div_mod(args1, args2, "store_div")
     def op_mul(self, args1, args2 = None):
         self.op_mul_div_mod(args1, args2, "store_mul")
+    def op_mod(self, args1, args2 = None):
+        self.op_mul_div_mod(args1, args2, "store_mod")
     ################################################  MATH OPERATIONS END
 
 
@@ -1050,11 +1052,12 @@ try_else_body: else_try (instruction)*
             | whilestatement
             | procedure_expr ";" 
             | loop_break ";"
-            | indexing ";"
-            
+
 ?string: string_concat
-        ?string_concat: RAW_STRING
-	      | string_concat "+" RAW_STRING -> string_concat
+        ?string_concat: compound_string
+	      | string_concat "+" compound_string -> string_concat
+        ?compound_string: RAW_STRING
+          | "ToString(" expression ")" -> to_string_op
 
 ?expression :  bool_or
         ?bool_or: bool_and 
@@ -1078,12 +1081,14 @@ try_else_body: else_try (instruction)*
 		?product: atom
 			| product "*" atom -> op_mul
 			| product "/" atom -> op_div
+            | product "%" atom -> op_mod
 
 		?atom: NUMBER         -> number
 			 | "-" atom       -> op_minus
 			 | "(" expression ")"
              | "not" expression  -> op_neg             
              | function_expr 
+             | indexing
              | NUMBER_NEG
              | BOOL
              | variable
@@ -1092,16 +1097,16 @@ try_else_body: else_try (instruction)*
 	?procedure_expr: variable params -> op_proc_call
     ?function_expr: variable params -> op_func_call
 		?params:  "("")" 
-			| "(" expression ")" 
-			| "(" expression ("," expression)+ ")" 
+			| "(" (expression | string) ")" 
+			| "(" (expression | string ) ("," (expression | string))+ ")" 
 
 return_expression: procedure_call_name | (NUMBER_NEG | NUMBER )
 
 ?result : ("result" return_expression) -> result
         | "result" return_expression ("," return_expression )+  -> result   
 
-?assignment: variable "=" expression
-           | variabledeclare "=" expression 
+?assignment: variable "=" (expression | string)
+           | variabledeclare "=" (expression | string)
            | multiple_assignment "=" function_retmultple_expr
 
 multiple_assignment : variable ("," variable)+ 
@@ -1158,7 +1163,7 @@ def test():
             array: Array;
             $GLOBAL2: Boolean;
             $GLOBAL: Number = 100;
-            array[0];
+            //array[0];
             while($GLOBAL > RelationFacA and $GLOBAL2) do
                 if(not ($GLOBAL2 == true))then
                     break;
@@ -1188,7 +1193,7 @@ def test():
            integer: Number = 0;
            $GLOBAL_INT: Number = 100;
            for Input = integer * Input2  to  Input2 + $GLOBAL_INT  do
-                integer =  Addition2(integer, Input, Input2); 
+                integer =  Addition2(integer, Addition2(integer, Input, Input2), Input2); 
                 if(integer > 2) then
                     num : Number;                    
                     for num = 0 to Addition(1,2) do

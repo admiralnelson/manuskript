@@ -34,7 +34,7 @@ reservedKeywords = [
         "break",
     ]
 
-DEBUG = True
+DEBUG = False
 
 BOOLEAN = 1
 NUMBER = 2
@@ -1050,6 +1050,7 @@ try_else_body: else_try (instruction)*
             | whilestatement
             | procedure_expr ";" 
             | loop_break ";"
+            | indexing ";"
             
 
 ?expression :  bool_or
@@ -1154,6 +1155,7 @@ def test():
             array: Array;
             $GLOBAL2: Boolean;
             $GLOBAL: Number = 100;
+            array[0];
             while($GLOBAL > RelationFacA and $GLOBAL2) do
                 if(not ($GLOBAL2 == true))then
                     break;

@@ -1052,6 +1052,9 @@ try_else_body: else_try (instruction)*
             | loop_break ";"
             | indexing ";"
             
+?string: string_concat
+        ?string_concat: RAW_STRING
+	      | string_concat "+" RAW_STRING -> string_concat
 
 ?expression :  bool_or
         ?bool_or: bool_and 
@@ -1121,7 +1124,7 @@ NAME: /\$?[A-Za-z][A-Za-z0-9_]*/
 NUMBER: /\d+\.?\d*/
 NUMBER_NEG: /\-\d+\.?\d*/
 NEWLINE: /\\n|\\r/
-STRING: /./
+RAW_STRING: /\".\"/
 TYPE: "Number" | "String" | "QString" | "Procedure" | "Function" | "Boolean"
     | "Faction" | "Presentation" | "Troop" | "Agent" | "Item" | "Array" | "DynamicArray"
 BOOL: "true"

@@ -667,6 +667,13 @@ class CalculateTree(Transformer):
                 var = self.isValidVariable(arg1)
                 self.lastAssignedVariable = var 
                 self.lastAssignedValue = str(arg2)
+        
+        if(len(self.loopEndIterators) > 0):
+            x = str(arg1) 
+            if(IsLocalVariable(x)):
+                x = ":" + x
+            if(x == self.loopEndIterators[-1][2]):
+                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + self.loopEndIterators[-1][0]+ "\", \"" +  x + "\"),\n"
 
 
     def variabledeclare(self, arg1, arg2):
@@ -728,7 +735,7 @@ class CalculateTree(Transformer):
                 raise Exception("cannot use boolean value here 1")
             self.mathVars.append(":floop" + str(self.parentsLevel))
             self.parentsLevel += 1
-            self.loopEndIterators.append((self.mathVars[-1], str(self.lastAssignedVariable[0])  , "for"))
+            self.loopEndIterators.append((self.mathVars[-1], str(self.lastAssignedVariable[0]), self.mathVars[-2] , "for"))
             self.output = self.output.replace("\xEE REPLACE2 \xEE", "(assign, \"" + self.mathVars[-1] + "\", 99999999),\n")      
             self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"") 
             self.output +=  "\t"*(self.blockLevel)+ "(assign, \""+  self.mathVars[-1] + "\", \""+ self.mathVars[-2]  + "\"),\n"
@@ -743,9 +750,10 @@ class CalculateTree(Transformer):
                     raise Exception("cannot use boolean value here 2")                
                 self.mathVars.append(":floop" + str(self.parentsLevel))
                 self.parentsLevel += 1
-                self.loopEndIterators.append((self.mathVars[-1], str(self.lastAssignedVariable[0]) , "for"))
+                self.loopEndIterators.append((self.mathVars[-1], str(self.lastAssignedVariable[0]) ,str(var[0]) ,"for"))
                 self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"" ) 
-                self.output = self.output.replace("\n\t"*(self.blockLevel - 1)+"\xEE REPLACE2 \xEE", "\n" ) 
+                #self.output = self.output.replace("\t"*(self.blockLevel - 1)+"\xEE REPLACE2 \xEE", "" ) 
+                self.output = self.output.replace("\xEE REPLACE2 \xEE", "(assign, \"" + self.mathVars[-1] + "\", 99999999),\n")    
                 self.output += "\t"*(self.blockLevel)+ "(assign, \""+  self.mathVars[-1] + "\", \""+ str(var[0]) + "\" ),\n"
                 self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
                 self.append_comment("\t"*(self.blockLevel) + "# -- loop header end\n")
@@ -757,7 +765,7 @@ class CalculateTree(Transformer):
                 self.output = self.output.replace("\xEE REPLACE2 \xEE", "(assign, \"" + self.mathVars[-1] + "\", 99999999),\n")                 
                 self.output +=  "\t"*(self.blockLevel)+ "(assign, \""+  self.mathVars[-1] + "\", "+ str(arg) + "),\n"
                 self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"")                 
-                self.loopEndIterators.append((self.mathVars[-1],  str(self.lastAssignedVariable[0]), "for"))
+                self.loopEndIterators.append((self.mathVars[-1],  str(self.lastAssignedVariable[0]), str(arg) ,"for"))
                 self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
                 self.append_comment("\t"*(self.blockLevel) + "# -- loop header end\n")
         if("\xEE REPLACE2 \xEE" in self.output):
@@ -777,7 +785,7 @@ class CalculateTree(Transformer):
         iteratorEnd  = self.loopEndIterators[-1]
         self.append_comment("\t"*(self.blockLevel) + "# -- break header begin\n")
         self.output +=  "\t"*(self.blockLevel) + "(assign, \"" + iteratorEnd[0] + "\", \""+ iteratorEnd[1] +"\" ),\n" 
-        if(iteratorEnd[2] == "reverse_for"):
+        if(iteratorEnd[3] == "reverse_for"):
             self.output +=  "\t"*(self.blockLevel) + "(val_add, \"" + iteratorEnd[0] + "\", 1 ),\n" 
         else:
             self.output +=  "\t"*(self.blockLevel) + "(val_sub, \"" + iteratorEnd[0] + "\", 1 ),\n" 
@@ -1156,9 +1164,20 @@ def test():
        begin
            integer: Number = 0;
            $GLOBAL_INT: Number = 100;
-           for Input = integer to  Input2 + $GLOBAL_INT  do
+           for Input = integer * Input2  to  Input2 + $GLOBAL_INT  do
                 integer =  Addition2(integer, Input, Input2); 
                 if(integer > 2) then
+                    num : Number;                    
+                    for num = 0 to Addition(1,2) do
+                        num2: Number = 100;
+                        i : Number;
+                        if(true) then
+                            integer  = integer  + 2;
+                        end
+                        for i = 0 to num2 do
+                            num2 = Addition(i, num2);
+                        end
+                    end
                     break;
                 end
                 integer = Addition(1, integer);

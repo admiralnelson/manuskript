@@ -52,8 +52,8 @@ def isBooleanLiteral(s):
     return False
 
 def ConvertBooleanLiteralToNumeric(s):
-    if s == "true" : return 1
-    if s == "false" : return 0
+    if s == "true" : return "1"
+    if s == "false" : return "0"
 
 def ElementContainsNone(l):
     j = 0
@@ -488,6 +488,7 @@ class CalculateTree(Transformer):
             self.output += "\t"*self.blockLevel +  "(try_begin),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "("+ op +"," 
             if(isNumber(arg1)): self.output += str(arg1)
+            elif(isBooleanLiteral(arg1)): self.output += ConvertBooleanLiteralToNumeric(arg1)
             else: 
                 if( arg1 != None and str(arg1[0] != '$')):
                     self.output += "\":" + str(arg1) + "\""
@@ -497,6 +498,7 @@ class CalculateTree(Transformer):
         self.output += ","
 
         if(isNumber(arg2)): self.output += str(arg2)
+        elif(isBooleanLiteral(arg2)): self.output += ConvertBooleanLiteralToNumeric(arg2)
         else: 
             if (arg2 == None):
                 var  = self.mathVars[-1]
@@ -824,7 +826,7 @@ class CalculateTree(Transformer):
         if(len(self.loopEndIterators) > 0):
             iteratorEnd  = self.loopEndIterators[-1]
             self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
-            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[0] + "\", \""+ iteratorEnd[1]  +"\"),\n"
+            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
             self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
         self.append_comment("\t"*(self.blockLevel) + "# -- if header \n")
         
@@ -835,7 +837,7 @@ class CalculateTree(Transformer):
         if(len(self.loopEndIterators) > 0):
             iteratorEnd  = self.loopEndIterators[-1]
             self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
-            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[0] + "\", \""+ iteratorEnd[1]  +"\"),\n"
+            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
             self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
         self.append_comment("\t"*(self.blockLevel) + "# -- else if header \n")
         print("else!")
@@ -845,7 +847,7 @@ class CalculateTree(Transformer):
         if(len(self.loopEndIterators) > 0):
             iteratorEnd  = self.loopEndIterators[-1]
             self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
-            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[0] + "\", \""+ iteratorEnd[1]  +"\"),\n"
+            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
             self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
         self.append_comment("\t"*(self.blockLevel) + "# -- else header \n")
         print("else!")
@@ -856,7 +858,7 @@ class CalculateTree(Transformer):
         if(len(self.loopEndIterators) > 0):
             iteratorEnd  = self.loopEndIterators[-1]
             self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
-            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[0] + "\", \""+ iteratorEnd[1]  +"\"),\n"
+            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
             self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
         print("begin!")
 
@@ -1153,8 +1155,11 @@ def test():
             $GLOBAL2: Boolean;
             $GLOBAL: Number = 100;
             while($GLOBAL > RelationFacA and $GLOBAL2) do
+                if(not ($GLOBAL2 == true))then
+                    break;
+                end
                 $GLOBAL = 0;    
-                break;
+                
             end
             for $GLOBAL = RelationFacA to 10 + 5 * 9 do
                 RelationFacA  = $GLOBAL;

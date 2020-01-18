@@ -32,6 +32,7 @@ reservedKeywords = [
         "and",
         "not",
         "break",
+        "ToString"
     ]
 
 DEBUG = False
@@ -50,6 +51,14 @@ def isBooleanLiteral(s):
     if s == "true" : return True
     if s == "false" : return True
     return False
+
+def isString(s):
+    if(type(s) == str):
+        return s.startswith("\"")
+    return False
+
+def removeQuotes(s):
+    return s.replace("\"", "")
 
 def ConvertBooleanLiteralToNumeric(s):
     if s == "true" : return "1"
@@ -118,6 +127,7 @@ class CalculateTree(Transformer):
         self.output += "\t"*self.blockLevel +  "(call_script, \"" +  str(var[0])  + "\", " + str(args)  + " ),\n"
 
     def op_func_call(self, arg, args):
+        if(str(arg) == "ToString"): return
         procedureSign = self.FindProcedureOrFunction(arg)
         paramSign =  []
         returnSign = []
@@ -620,6 +630,8 @@ class CalculateTree(Transformer):
                 self.lastAssignedVariable = var
                 self.lastAssignedValue = self.mathVars[-1]
                 del self.mathVars[:]
+        elif(isString(str(arg2))):
+            self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  arg1 + "\", \"@" + removeQuotes(str(arg2)) +"\"),\n" 
         else:            
             self.parentsLevel = 1
             variable = self.isValidVariable(arg1)
@@ -888,6 +900,14 @@ class CalculateTree(Transformer):
             print("# params declare: " + str(args))
         self.append_comment("\t"*self.blockLevel + "#---parameter declarations end---\n ")
 
+    def string_concat(self, *args):
+        self.mathVars.append(":strgroup" + str(self.parentsLevel))
+        self.parentsLevel += 1
+        self.output += "\t"*self.blockLevel + "assign," + str(args) + "\n"
+
+    def to_string_op(self, *args):
+        self.output += "\t"*self.blockLevel  + "to string op," + str(args) + "\n"
+
 
     def exitprocedure(self):
         self.output +=  "\t"*self.blockLevel + "(eq, 0, 1)"
@@ -978,6 +998,7 @@ class CalculateTree(Transformer):
         if(name.startswith(":bgroup")): return "Boolean"
         if(name.startswith(":paren")): return "Number"
         if(name.startswith(":floop")): return "Number"
+        if(name.startswith(":strgroup")): return "Number"
         return False
 
     def append_comment(self, text):
@@ -1052,10 +1073,9 @@ try_else_body: else_try (instruction)*
             | whilestatement
             | procedure_expr ";" 
             | loop_break ";"
-
 ?string: string_concat
         ?string_concat: compound_string
-	      | string_concat "+" compound_string -> string_concat
+	      | compound_string  "+" string_concat -> string_concat
         ?compound_string: RAW_STRING
           | "ToString(" expression ")" -> to_string_op
 
@@ -1129,7 +1149,7 @@ NAME: /\$?[A-Za-z][A-Za-z0-9_]*/
 NUMBER: /\d+\.?\d*/
 NUMBER_NEG: /\-\d+\.?\d*/
 NEWLINE: /\\n|\\r/
-RAW_STRING: /\".\"/
+RAW_STRING: /"(.*?)"/
 TYPE: "Number" | "String" | "QString" | "Procedure" | "Function" | "Boolean"
     | "Faction" | "Presentation" | "Troop" | "Agent" | "Item" | "Array" | "DynamicArray"
 BOOL: "true"
@@ -1163,7 +1183,11 @@ def test():
             array: Array;
             $GLOBAL2: Boolean;
             $GLOBAL: Number = 100;
-            //array[0];
+            string1 : String =  "test" + "tes123";
+            string2 : String =  "test";
+            //string3 : String = ToString(123);
+            string4 : String =  "test" + "tes123" + ToString(123);
+            string5 : String =  "test" + "tes123" + ToString(123);
             while($GLOBAL > RelationFacA and $GLOBAL2) do
                 if(not ($GLOBAL2 == true))then
                     break;

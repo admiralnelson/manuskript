@@ -6,6 +6,7 @@ except NameError:
     pass
 
 import turtle
+import re
 import random
 from lark import Lark,  Transformer, v_args
 from lark.tree import pydot__tree_to_png
@@ -36,7 +37,7 @@ reservedKeywords = [
         "DisplayMessage"
     ]
 
-DEBUG = True
+DEBUG = False
 
 BOOLEAN = 1
 NUMBER = 2
@@ -52,6 +53,8 @@ def isBooleanLiteral(s):
     if s == "true" : return True
     if s == "false" : return True
     return False
+
+def isEmptyString(s) : return s == "\"\"";
 
 def isString(s):
     if(type(s) == str):
@@ -77,6 +80,9 @@ def ElementContainsNone(l):
 def IsLocalVariable(s):
     return s[0] != "$"
 
+def VarWithoutColon(s):
+    return s[0] != ":" and IsLocalVariable(s)
+
 def DecorateWithQuotes(s):
     if(s[0] != "\"" and s[1] != "$"): return s
     if(s[0] != "\""): return s
@@ -95,10 +101,11 @@ def isVariable(s):
     except ValueError:
         return True
 
-def ConvertToStringID(s):    
+def ConvertToStringID(s):  
+    s = removeQuotes(s).lstrip().rstrip()
     s = s.replace(" ", "_")
-    s = s.replace("\"", "")
-    s = s.replace("^", "")
+    s = s.replace("!", "ex_sym_")
+    s = re.sub(r"[^0-9a-zA-Z_\s]", "", s)
     out = "str_" + s
     return DecoreateWithQuotesStr(out)
 
@@ -108,11 +115,92 @@ stringTables = []
 
 
 def PrintStringTables(stringTables):
-    out = "["
+    out = "manuskript_strings = [\n"
     for x in stringTables:
-        out += "\t(" + x[0] + "," + x[1] + "),\n"
+        out += "\t(\"" + x[0][5:] + "," + x[1] + "),\n"
     out += "]"
     return out
+
+def WriteProcessScript():
+    file =  """
+import string
+from module_info import *
+from module_scripts import *
+
+from process_common import *
+from process_operations import *
+
+def save_scripts(variable_list,variable_uses,scripts,tag_uses,quick_strings):
+  file = open(export_dir + "scripts.txt","w")
+  file.write("scriptsfile version 1\n")
+  file.write("%d\n"%len(scripts))
+  temp_list = []
+  list_type = type(temp_list)
+  for i_script in xrange(len(scripts)):
+    func = scripts[i_script]
+    if (type(func[1]) == list_type):
+      file.write("%s -1\n"%(convert_to_identifier(func[0])))
+      save_statement_block(file,convert_to_identifier(func[0]), 0,func[1], variable_list,variable_uses,tag_uses,quick_strings)
+    else:
+      file.write("%s %f\n"%(convert_to_identifier(func[0]), func[1]))
+      save_statement_block(file,convert_to_identifier(func[0]), 0,func[2], variable_list,variable_uses,tag_uses,quick_strings)
+    file.write("\n")
+  file.close()
+
+def save_python_header():
+  file = open("./ID_scripts.py","w")
+  for i_script in xrange(len(scripts)):
+    file.write("script_%s = %d\n"%(convert_to_identifier(scripts[i_script][0]),i_script))
+  file.write("\n\n")
+  file.close()
+
+
+print "Exporting scripts..."
+save_python_header()
+variable_uses = []
+variables = load_variables(export_dir, variable_uses)
+tag_uses = load_tag_uses(export_dir)
+quick_strings = load_quick_strings(export_dir)
+save_scripts(variables,variable_uses,scripts,tag_uses,quick_strings)
+save_variables(export_dir,variables,variable_uses)
+save_tag_uses(export_dir, tag_uses)
+save_quick_strings(export_dir,quick_strings)
+    """
+
+def WriteToFile(procedures, stringTables):
+    with open("manuskrip_script.py", "w") as file:
+        header = """
+# -*- coding: cp1254 -*-
+from header_common import *
+from header_operations import *
+from module_constants import *
+from module_constants import *
+from header_parties import *
+from header_skills import *
+from header_mission_templates import *
+from header_items import *
+from header_triggers import *
+from header_terrain_types import *
+from header_music import *
+from header_map_icons import *
+from header_presentations import *
+from ID_animations import *
+
+####################################################################################################################
+# scripts is a list of script records.
+# Each script record contns the following two fields:
+# 1) Script id: The prefix "script_" will be inserted when referencing scripts.
+# 2) Operation block: This must be a valid operation block. See header_operations.py for reference.
+####################################################################################################################
+manuskript = [
+"""
+        file.write(header)
+        for x in procedures:
+            file.write(x + "\n")
+        file.write("]")
+    with open("manuskrip_strings.py", "w") as file:
+        file.write(PrintStringTables(stringTables))
+
 
 @v_args(inline=True) # Affects the signatures of the methods
 class CalculateTree(Transformer):
@@ -534,15 +622,14 @@ class CalculateTree(Transformer):
             if(isNumber(arg1)): self.output += str(arg1)
             elif(isBooleanLiteral(arg1)): self.output += ConvertBooleanLiteralToNumeric(arg1)
             else: 
-                if( arg1 != None and str(arg1[0] != '$')):
-                    self.output += "\":" + str(arg1) + "\""
+                if(VarWithoutColon(var)):
+                    self.output += "\":" + var + "\""
                 else:
-                    self.output += "\"" + self.mathVars[-1] + "\""
+                    self.output += "\"" + var + "\""
         
         self.output += ","
-
-        if (arg1 == None):  self.output += "\"" + self.mathVars[-2]  + "\""
-        elif(isNumber(arg2)): self.output += str(arg2)
+        
+        if(isNumber(arg2)): self.output += str(arg2)
         elif(isBooleanLiteral(arg2)): self.output += ConvertBooleanLiteralToNumeric(arg2)
         else: 
             if (arg2 == None):
@@ -566,7 +653,7 @@ class CalculateTree(Transformer):
             self.output += "\t"*self.blockLevel +  "(try_begin),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(eq, \"" +  self.mathVars[-2] + "\", 1),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
-            self.output += "\t"*self.blockLevel +  "(try_else),\n"
+            self.output += "\t"*self.blockLevel +  "(else_try),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(eq, \"" +  self.mathVars[-2] + "\", 0),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
             self.output += "\t"*self.blockLevel +  "(try_end),\n"            
@@ -582,7 +669,7 @@ class CalculateTree(Transformer):
             self.output += "\t"*self.blockLevel +  "(try_begin),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(eq, " +  str(arg1) + ", 1),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 0),\n"
-            self.output += "\t"*self.blockLevel +  "(try_else),\n"
+            self.output += "\t"*self.blockLevel +  "(else_try),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(eq, " +  str(arg1) + ", 0),\n"
             self.output += "\t"*((self.blockLevel)+1) +  "(assign, \""+ self.mathVars[-1]  +"\", 1),\n"
             self.output += "\t"*self.blockLevel +  "(try_end),\n"
@@ -661,15 +748,20 @@ class CalculateTree(Transformer):
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  var[0] + "\", \"" + self.mathVars[-1] +"\"),\n" 
                 else:
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  var[0] + "\", \"@{s" + str(self.stringRegCounter) +"}\"),\n" 
-                    self.stringRegCounter += 1
+                    self.stringRegCounter = var[2]
                 self.lastAssignedVariable = var
                 self.lastAssignedValue = self.mathVars[-1]
                 del self.mathVars[:]
         elif(isString(str(arg2))):
                 variable = self.isValidVariable(arg1)
-                stringTables.append((ConvertToStringID(str(arg2)), str(arg2)))
-                self.output +=  "\t"*self.blockLevel  +  "(str_store_string, s" + str(variable[2])  + ", " +  ConvertToStringID(str(arg2)) + "),\n"
-                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", \"@{s" + str(variable[2])  + "}\"),\n"
+                if(not isEmptyString(str(arg2))):
+                    stringTables.append((ConvertToStringID(str(arg2)), str(arg2)))
+                    self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(variable[2])  + "),\n"
+                    self.output +=  "\t"*self.blockLevel  +  "(str_store_string, s" + str(variable[2])  + ", " +  ConvertToStringID(str(arg2)) + "),\n"
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", \"@{s" + str(variable[2])  + "}\"),\n"
+                else:
+                    self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(variable[2])  + "),\n"
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", \"@{s" + str(variable[2])  + "}\"),\n"
                 var = self.isValidVariable(arg1)
                 self.lastAssignedVariable = var 
                 self.lastAssignedValue = str(arg2)
@@ -726,7 +818,7 @@ class CalculateTree(Transformer):
                 if(not isNumber(arg2)):
                     raise Exception( "COMPILER ERROR: " + arg1 + " is being assigned with incorrect data type. assigned value: " + str(arg2) + ", expected: Numeric" + ". At procedure/function " + self.currentProcedureName )
             else:
-                self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", \":" +  str(arg2) + "\"),\n"
+                #self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", \":" +  str(arg2) + "\"),\n"
                 var = self.isValidVariable(arg1)
                 self.lastAssignedVariable = var 
                 self.lastAssignedValue = str(arg2)
@@ -766,8 +858,10 @@ class CalculateTree(Transformer):
             self.output +=  "\t"*self.blockLevel+ "(assign, \""+ str(arg1) + "\", 0),\n" 
             self.globals.append(( arg1, arg2, self.currentProcedureName))
             self.lastVariableNameDeclared  = (arg1, arg1)
-        if(self.stringLimit < 64):
-            if(str(arg2) == "String"): self.stringLimit += 1
+        if(self.stringLimit < 63):
+            if(str(arg2) == "String"):
+                self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(self.stringLimit)  + "),\n"
+                self.stringLimit += 1
         else:
             raise Exception("unable to allocate new string variable! (max 64 units)")
 
@@ -812,7 +906,7 @@ class CalculateTree(Transformer):
             self.output = self.output.replace("\xEE REPLACE2 \xEE", "(assign, \"" + self.mathVars[-1] + "\", \""+ str(self.lastAssignedVariable[0]) +"\"),\n" + "\t"*(self.blockLevel - 1) + "(val_add, \"" + self.mathVars[-1] + "\", 1),\n" )
             self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"") 
             self.output +=  "\t"*(self.blockLevel)+ "(assign, \""+  self.mathVars[-1] + "\", \""+ self.mathVars[-2]  + "\"),\n"
-            self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
+            self.output +=  "\t"*(self.blockLevel)+ "(lt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
             self.append_comment("\t"*(self.blockLevel) + "# -- for loop header end\n")
         else:
             var = self.isValidVariable(str(arg))
@@ -828,7 +922,7 @@ class CalculateTree(Transformer):
                 #self.output = self.output.replace("\t"*(self.blockLevel - 1)+"\xEE REPLACE2 \xEE", "" ) 
                 self.output = self.output.replace("\xEE REPLACE2 \xEE", "(assign, \"" + self.mathVars[-1] + "\", \""+ str(self.lastAssignedVariable[0]) +"\"),\n" + "\t"*(self.blockLevel - 1) + "(val_add, \"" + self.mathVars[-1] + "\", 1),\n" )
                 self.output += "\t"*(self.blockLevel)+ "(assign, \""+  self.mathVars[-1] + "\", \""+ str(var[0]) + "\" ),\n"
-                self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
+                self.output +=  "\t"*(self.blockLevel)+ "(lt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
                 self.append_comment("\t"*(self.blockLevel) + "# -- for loop header end\n")
             else:
                 if(isBooleanLiteral(str(arg))):
@@ -839,7 +933,7 @@ class CalculateTree(Transformer):
                 self.output +=  "\t"*(self.blockLevel)+ "(assign, \""+  self.mathVars[-1] + "\", "+ str(arg) + "),\n"
                 self.output = self.output.replace("\xEE REPLACE \xEE", "\"" + self.mathVars[-1] + "\"")                 
                 self.loopEndIterators.append((self.mathVars[-1],  str(self.lastAssignedVariable[0]), str(arg) ,"for"))
-                self.output +=  "\t"*(self.blockLevel)+ "(gt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
+                self.output +=  "\t"*(self.blockLevel)+ "(lt, \""+  str(self.lastAssignedVariable[0]) + "\", \"" + self.mathVars[-1] + "\"),\n"
                 self.append_comment("\t"*(self.blockLevel) + "# -- for loop header end\n")
         if("\xEE REPLACE2 \xEE" in self.output):
             print("assaas")
@@ -962,7 +1056,10 @@ class CalculateTree(Transformer):
         args = list(args)
         self.mathVars.append(":strgroup" + str(self.parentsLevel))
         self.parentsLevel += 1
-        if(None not in args):
+        if(None in args):
+            pass
+            #self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{s"+  str(self.stringRegCounter) +"}\"),\n"
+        if(isString(str(args[0]) )):
             self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(self.stringRegCounter) + "),\n"
         if(args[0] == None): args.pop(0)
         i = 0
@@ -974,34 +1071,39 @@ class CalculateTree(Transformer):
 
     def to_string_op(self, arg):
         if(isString(arg)):            
-            stringTables.append((ConvertToStringID(arg), arg))
-            self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{s"+ str(self.stringRegCounter) +"}\" )\n"
-            self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", " + ConvertToStringID(arg) + ")\n"
+            stringTables.append((ConvertToStringID(arg), arg))       
+            #self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(self.stringRegCounter) + "),\n"
+            self.output += "\t"*self.blockLevel + "(str_store_string, s63"+ ", " + ConvertToStringID(arg) +"),\n"
+            self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{s63}\" ),\n"
+            #self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", " + ConvertToStringID(arg) + "),\n"
         elif(isNumber(arg)):
-           self.output += "\t"*self.blockLevel + "(assign, reg0, "+  str(arg) +")\n"
-           self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0}\" )\n"
+           self.output += "\t"*self.blockLevel + "(assign, reg0, "+  str(arg) +"),\n"
+           self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0}\" ),\n"
         elif(isBooleanLiteral(arg)):
            arg = 0 if arg == "false" else 1
-           self.output += "\t"*self.blockLevel + "(assign, reg0, "+  str(arg) +")\n"
-           self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0?true:false}\" )\n"
+           self.output += "\t"*self.blockLevel + "(assign, reg0, "+  str(arg) +"),\n"
+           self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0?true:false}\" ),\n"
         elif(self.isValidVariable(arg)):
            var = self.isValidVariable(arg)
            if(var[1] == "Number"):
-                self.output += "\t"*self.blockLevel + "(assign, reg0, \""+  var[0] +"\")\n"
-                self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0}\" )\n"
+                self.output += "\t"*self.blockLevel + "(assign, reg0, \""+  var[0] +"\"),\n"
+                self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0}\" ),\n"
            elif(var[1] == "Boolean"):
-                self.output += "\t"*self.blockLevel + "(assign, reg0, \""+  var[0] +"\")\n"
-                self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0?TRUE:FALSE}\" )\n"
+                self.output += "\t"*self.blockLevel + "(assign, reg0, \""+  var[0] +"\"),\n"
+                self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0?TRUE:FALSE}\" ),\n"
+           elif(var[1] == "String"):
+                pass
+                #self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}" + "{s" +  str(self.stringRegCounter) +"}\" ),\n"
 
     def display_msg(self, arg):
         var = self.isValidVariable(arg)
         if(var and var[1] == "String"):
-            self.output += "\t"*self.blockLevel + "(display_message, \""+ str(var[0]) +"\" )\n"
+            self.output += "\t"*self.blockLevel + "(display_message, \""+ str(var[0]) +"\" ),\n"
         else:
             raise Exception("Must string variable!")
 
     def exitprocedure(self):
-        self.output +=  "\t"*self.blockLevel + "(eq, 0, 1)"
+        self.output +=  "\t"*self.blockLevel + "(eq, 0, 1),"
 
     def procedure(self, *args):
         proc = self.WriteDocumentation()
@@ -1167,6 +1269,7 @@ if_body: if_try  test beginblock (instruction)*
 try_else_if_body : else_if_try test beginblock (instruction)* 
 try_else_body: else_try (instruction)* 
 
+display_msg: "DisplayMessage" "(" NAME  ")" 
      
 ?instruction: assignment ";"
             | variabledeclare ";"
@@ -1178,15 +1281,6 @@ try_else_body: else_try (instruction)*
             | display_msg ";"
             | procedure_expr ";" 
             | loop_break ";"
-
-?string: string_concat 
-        ?string_concat: compound_string
-	      | string_concat  "+" compound_string -> string_concat
-
-        ?compound_string: RAW_STRING
-          | "ToString" "(" (NUMBER_NEG | NUMBER | NAME ) ")" 
-
-          display_msg: "DisplayMessage" "(" NAME  ")" 
 
 ?expression :  bool_or
         ?bool_or: bool_and 
@@ -1206,6 +1300,7 @@ try_else_body: else_try (instruction)*
 		?sum: product
 			| sum "+" product -> op_add
 			| sum "-" product -> op_sub
+            | sum  ".." atom -> string_concat
 
 		?product: atom
 			| product "*" atom -> op_mul
@@ -1221,21 +1316,24 @@ try_else_body: else_try (instruction)*
              | NUMBER_NEG
              | BOOL
              | variable
+             | RAW_STRING
+             | "ToString" "(" (NUMBER_NEG | NUMBER | NAME ) ")" 
+
 
     ?function_retmultple_expr: variable params -> op_func_call_mult_return
 	?procedure_expr: variable params -> op_proc_call
     ?function_expr: variable params -> op_func_call
 		?params:  "("")" 
-			| "(" (expression | string) ")" 
-			| "(" (expression | string ) ("," (expression | string))+ ")" 
+			| "(" (expression ) ")" 
+			| "(" (expression ) ("," (expression ))+ ")" 
 
 return_expression: procedure_call_name | (NUMBER_NEG | NUMBER )
 
 ?result : ("result" return_expression) -> result
         | "result" return_expression ("," return_expression )+  -> result   
 
-?assignment: variable "=" (expression | string)
-           | variabledeclare "=" (expression | string)
+?assignment: variable "=" (expression)
+           | variabledeclare "=" (expression)
            | multiple_assignment "=" function_retmultple_expr
 
 multiple_assignment : variable ("," variable)+ 
@@ -1289,18 +1387,22 @@ def test():
        procedure FizzBuzz(input : Number)
        begin
             output: String;
+            output = "test" .. output;
+            output = output .. "test" .. output;
             output2: String;
-            output2 = ToString(input);
+            output2 = "Hello world";
+            DisplayMessage(output2);
             i : Number;
             for i = 0 to input do
                 if(i % 3 == 0) then
                     output = "Fizz";
                 elseif( i % 5 == 0) then
-                    output = "Buzz";
+                    output = output .. "Buzz";
                 elseif (i % 3 != 0 and i % 5 != 0) then
-                    output = "Nr. " + ToString(i) + " - ";
+                    output = "Nr. " .. ToString(i) .. " number test  ";
                 end
                 DisplayMessage(output);
+                output = "";
             end
        end
        procedure GanjilGenap(input : Number)
@@ -1310,9 +1412,9 @@ def test():
             i : Number;
             for i = 0 to input do
                 if(i % 2 == 0) then
-                    output = "Genap " + ToString(i);
+                    output = "Genap " .. ToString(i);
                 else
-                    output = "OI" + " ini ganjil " + ToString(i) + " !!";
+                    output = "OI" .. " ini ganjil " .. ToString(i) .. " !!";
                 end
                 DisplayMessage(output);
             end
@@ -1324,13 +1426,13 @@ def test():
             array: Array;
             $GLOBAL2: Boolean;
             $GLOBAL: Number = 100;
-            string1 : String =  "Concat " + "Satu " + " Tiga";
+            string1 : String =  "Concat " .. "Satu " .. " Tiga";
             string2 : String =  "test";
             //string3 : String = ToString(123);
-            string4 : String =  "begin test" + "tes123" + ToString(123);
-            string5 : String =  "begin test" + "tes123" + ToString($GLOBAL2);
-            string6 : String =  "begin test" + "tes123" + ToString(123) + "tes123 end";
-            string7 : String =  "begin test" + "tes123" + ToString($GLOBAL) + "tes123 1" + "tes123 end";
+            string4 : String =  "begin test" .. "tes123" .. ToString(123);
+            string5 : String =  "begin test" .. "tes123" .. ToString($GLOBAL2);
+            string6 : String =  "begin test" .. "tes123" .. ToString(123) .. "tes123 end";
+            string7 : String =  "begin test" .. "tes123" .. ToString($GLOBAL) .. "tes123 1" .. "tes123 end";
             while($GLOBAL > RelationFacA and $GLOBAL2) do
                 if(not ($GLOBAL2 == true))then
                     break;
@@ -1415,7 +1517,7 @@ def test():
     #print(str(procedures[4]))
     #print(str(stringTables))
     #pydot__tree_to_png(tree, "output.png")
-
+    WriteToFile(procedures,stringTables )
 if __name__ == '__main__':
     test()
     #main()

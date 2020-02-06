@@ -116,6 +116,7 @@ stringTables = []
 
 def PrintStringTables(stringTables):
     out = "manuskript_strings = [\n"
+    stringTables = set(stringTables)
     for x in stringTables:
         out += "\t(\"" + x[0][5:] + "," + x[1] + "),\n"
     out += "]"
@@ -747,7 +748,9 @@ class CalculateTree(Transformer):
                 if(self.isValidVariable(self.mathVars[-1])[1] != "String"):
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  var[0] + "\", \"" + self.mathVars[-1] +"\"),\n" 
                 else:
-                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  var[0] + "\", \"@{s" + str(self.stringRegCounter) +"}\"),\n" 
+                    stringConcat = "\"{s"+ str(self.stringRegCounter)  +"}\""
+                    stringTables.append((ConvertToStringID(stringConcat), stringConcat))
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  var[0] + "\", " + ConvertToStringID(stringConcat) +"),\n" 
                     self.stringRegCounter = var[2]
                 self.lastAssignedVariable = var
                 self.lastAssignedValue = self.mathVars[-1]
@@ -755,13 +758,18 @@ class CalculateTree(Transformer):
         elif(isString(str(arg2))):
                 variable = self.isValidVariable(arg1)
                 if(not isEmptyString(str(arg2))):
-                    stringTables.append((ConvertToStringID(str(arg2)), str(arg2)))
+                    stringTables.append((ConvertToStringID(str(arg2)), str(arg2)))      
+                    stringConcat = "\"{s"+ str(variable[2])  +"}\""
+                    stringTables.append((ConvertToStringID(stringConcat), stringConcat))
+                    self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +","+ ConvertToStringID(stringConcat) +" ),\n"
                     self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(variable[2])  + "),\n"
                     self.output +=  "\t"*self.blockLevel  +  "(str_store_string, s" + str(variable[2])  + ", " +  ConvertToStringID(str(arg2)) + "),\n"
-                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", \"@{s" + str(variable[2])  + "}\"),\n"
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", " + ConvertToStringID(stringConcat)  + "),\n"
                 else:
+                    stringConcat = "\"{s"+ str(variable[2])  +"}\""
+                    stringTables.append((ConvertToStringID(stringConcat), stringConcat))
                     self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(variable[2])  + "),\n"
-                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", \"@{s" + str(variable[2])  + "}\"),\n"
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", " + ConvertToStringID(stringConcat)  + "),\n"
                 var = self.isValidVariable(arg1)
                 self.lastAssignedVariable = var 
                 self.lastAssignedValue = str(arg2)
@@ -789,7 +797,9 @@ class CalculateTree(Transformer):
                 if(variable[1] == "String"):
                     self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(self.stringRegCounter) + "),\n"
                     self.to_string_op(variable2[0])
-                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0] + "\", \"@{s" + str(self.stringRegCounter) + "}\"),\n"
+                    stringConcat = "\"{s"+ str(self.stringRegCounter)   +"}\""
+                    stringTables.append((ConvertToStringID(stringConcat), stringConcat))
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0] + "\", " + ConvertToStringID(stringConcat) + "),\n"
                 elif(variable[1] == variable2[1]):
                     self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + arg1  + "\", \"" +  arg2 + "\"),\n"
                     var = self.isValidVariable(arg1)
@@ -956,7 +966,7 @@ class CalculateTree(Transformer):
             self.output +=  "\t"*(self.blockLevel) + "(val_add, \"" + iteratorEnd[1] + "\", 1 ),\n" 
         else:
             self.output +=  "\t"*(self.blockLevel) + "(val_sub, \"" + iteratorEnd[1] + "\", 1 ),\n" 
-        self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
+        self.output +=  "\t"*(self.blockLevel) + "(lt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
         self.append_comment("\t"*(self.blockLevel) + "# -- break header end\n")
         
         
@@ -991,7 +1001,7 @@ class CalculateTree(Transformer):
         if(len(self.loopEndIterators) > 0):
             iteratorEnd  = self.loopEndIterators[-1]
             self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
-            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
+            self.output +=  "\t"*(self.blockLevel) + "(lt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
             self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
         self.append_comment("\t"*(self.blockLevel) + "# -- if header \n")
         
@@ -1002,7 +1012,7 @@ class CalculateTree(Transformer):
         if(len(self.loopEndIterators) > 0):
             iteratorEnd  = self.loopEndIterators[-1]
             self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
-            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
+            self.output +=  "\t"*(self.blockLevel) + "(lt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
             self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
         self.append_comment("\t"*(self.blockLevel) + "# -- else if header \n")
         print("else!")
@@ -1012,7 +1022,7 @@ class CalculateTree(Transformer):
         if(len(self.loopEndIterators) > 0):
             iteratorEnd  = self.loopEndIterators[-1]
             self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
-            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
+            self.output +=  "\t"*(self.blockLevel) + "(lt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
             self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
         self.append_comment("\t"*(self.blockLevel) + "# -- else header \n")
         print("else!")
@@ -1023,7 +1033,7 @@ class CalculateTree(Transformer):
         if(len(self.loopEndIterators) > 0):
             iteratorEnd  = self.loopEndIterators[-1]
             self.append_comment("\t"*(self.blockLevel) + "# -- this is will be used to enable break functionality for loop " + self.loopEndIterators[-1][0] + "\n")
-            self.output +=  "\t"*(self.blockLevel) + "(gt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
+            self.output +=  "\t"*(self.blockLevel) + "(lt, \"" + iteratorEnd[1] + "\", \""+ iteratorEnd[0]  +"\"),\n"
             self.append_comment("\t"*(self.blockLevel) + "# -- end \n")
         print("begin!")
 
@@ -1058,7 +1068,7 @@ class CalculateTree(Transformer):
         self.parentsLevel += 1
         if(None in args):
             pass
-            #self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{s"+  str(self.stringRegCounter) +"}\"),\n"
+            #self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@\"{s"+  str(self.stringRegCounter) +"}{s"+  str(self.stringRegCounter) +"}\"),\n"
         if(isString(str(args[0]) )):
             self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(self.stringRegCounter) + "),\n"
         if(args[0] == None): args.pop(0)
@@ -1072,28 +1082,42 @@ class CalculateTree(Transformer):
     def to_string_op(self, arg):
         if(isString(arg)):            
             stringTables.append((ConvertToStringID(arg), arg))       
+            stringConcat = "\"{s"+  str(self.stringRegCounter) +"}{s63}\""
+            stringTables.append((ConvertToStringID(stringConcat), stringConcat))
             #self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(self.stringRegCounter) + "),\n"
             self.output += "\t"*self.blockLevel + "(str_store_string, s63"+ ", " + ConvertToStringID(arg) +"),\n"
-            self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{s63}\" ),\n"
+            self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", " + ConvertToStringID(stringConcat) + " ),\n"
             #self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", " + ConvertToStringID(arg) + "),\n"
         elif(isNumber(arg)):
-           self.output += "\t"*self.blockLevel + "(assign, reg0, "+  str(arg) +"),\n"
-           self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0}\" ),\n"
+           self.output += "\t"*self.blockLevel + "(assign, reg0, "+  str(arg) +"),\n"           
+           stringConcat = "\"{s"+  str(self.stringRegCounter) +"}{reg0}\""
+           stringTables.append((ConvertToStringID(stringConcat), stringConcat))
+           self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +","+ ConvertToStringID(stringConcat) +" ),\n"
         elif(isBooleanLiteral(arg)):
            arg = 0 if arg == "false" else 1
+           stringConcat = "\"{s"+  str(self.stringRegCounter) +"}{reg0?true:false}\"" 
+           stringTables.append((ConvertToStringID(stringConcat), stringConcat))
            self.output += "\t"*self.blockLevel + "(assign, reg0, "+  str(arg) +"),\n"
-           self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0?true:false}\" ),\n"
+           self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +","+ ConvertToStringID(stringConcat) + "),\n"
         elif(self.isValidVariable(arg)):
            var = self.isValidVariable(arg)
            if(var[1] == "Number"):
                 self.output += "\t"*self.blockLevel + "(assign, reg0, \""+  var[0] +"\"),\n"
-                self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0}\" ),\n"
+                stringConcat = "\"{s"+  str(self.stringRegCounter) +"}{reg0}\""
+                stringTables.append((ConvertToStringID(stringConcat), stringConcat))
+                self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", " + ConvertToStringID(stringConcat)  + " ),\n"
            elif(var[1] == "Boolean"):
-                self.output += "\t"*self.blockLevel + "(assign, reg0, \""+  var[0] +"\"),\n"
-                self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}{reg0?TRUE:FALSE}\" ),\n"
+               stringConcat = "\"{s"+  str(self.stringRegCounter) +"}{reg0?true:false}\""
+               stringTables.append((ConvertToStringID(stringConcat), stringConcat))
+               self.output += "\t"*self.blockLevel + "(assign, reg0, \""+  var[0] +"\"),\n"
+               self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +","+ ConvertToStringID(stringConcat) + "),\n"
            elif(var[1] == "String"):
-                pass
-                #self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", \"@{s"+  str(self.stringRegCounter) +"}" + "{s" +  str(self.stringRegCounter) +"}\" ),\n"
+               stringTables.append((ConvertToStringID(arg), arg))       
+               stringConcat = "\"{s"+  str(self.stringRegCounter) +"}{s63}\""
+               stringTables.append((ConvertToStringID(stringConcat), stringConcat))
+               #self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(self.stringRegCounter) + "),\n"
+               self.output += "\t"*self.blockLevel + "(str_store_string, s63"+ ", " + ConvertToStringID(arg) +"),\n"
+               self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", " + ConvertToStringID(stringConcat) + " ),\n"
 
     def display_msg(self, arg):
         var = self.isValidVariable(arg)
@@ -1387,18 +1411,21 @@ def test():
        procedure FizzBuzz(input : Number)
        begin
             output: String;
-            output = "test" .. output;
-            output = output .. "test" .. output;
             output2: String;
+            output = "test" .. output;
+            output = output .. "xyx" .. output2 .. "123";
+
             output2 = "Hello world";
             DisplayMessage(output2);
             i : Number;
             for i = 0 to input do
                 if(i % 3 == 0) then
                     output = "Fizz";
-                elseif( i % 5 == 0) then
+                end
+                if( i % 5 == 0) then
                     output = output .. "Buzz";
-                elseif (i % 3 != 0 and i % 5 != 0) then
+                end
+                if (i % 3 != 0 and i % 5 != 0) then
                     output = "Nr. " .. ToString(i) .. " number test  ";
                 end
                 DisplayMessage(output);

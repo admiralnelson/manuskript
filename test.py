@@ -33,6 +33,8 @@ reservedKeywords = [
         "and",
         "not",
         "break",
+        "stringStack",
+        "stringCounter",
         "ToString",
         "DisplayMessage"
     ]
@@ -198,6 +200,69 @@ manuskript = [
         file.write(header)
         for x in procedures:
             file.write(x + "\n")
+        file.write(
+        """
+# script_push_string_stack
+# Input: string
+# Output: none
+("push_string_stack",
+[
+    (store_script_param, ":string", 1), 
+    # store the name temp..
+    (party_set_name, "p_temp_party", ":string"),
+    (str_store_party_name, "p_temp_party", s0),
+    # "push" new string stack
+    (set_spawn_radius, 0),
+    (spawn_around_party, "p_temp_party", "pt_none"), 
+    (assign, ":stringStack", reg0),
+    (party_set_flags, ":stringStack", pf_disabled, 1),
+    # set its name from the name temp..
+    (party_set_name, ":stringStack", s0),
+    (str_store_party_name, s2, ":stringStack"),
+    # inc string stack
+    (party_get_slot,":top", "p_string_stack", 0),	
+    (val_add, ":top", 1),
+    (party_set_slot, "p_string_stack", 0, ":top"),
+    (party_set_slot, "p_string_stack", ":top", reg0),
+]),
+# script_get_string_stack
+# Input: index (starts from 0)
+# Output: s0 = string
+#works!
+("get_string_stack",
+[
+    (store_script_param, ":index", 1), 
+    (assign, ":string", 0),
+    (assign, reg0, ":index"),
+    (party_get_slot,":top", "p_string_stack", 0),
+    (party_get_slot,":string", "p_string_stack", ":index"),
+    (assign, reg1, ":string"),
+    (str_store_party_name, s0, ":string"),
+]),
+# script_pop_to_nth_string_stack
+# called right before exiting function 
+# Input: party
+# Output: none
+#works!
+("pop_to_nth_string_stack",
+[
+    (store_script_param, ":nth", 1), 
+    (assign, ":top", 0),
+    (assign, reg0, ":nth"),   
+    (party_get_slot,":top", "p_string_stack", 0),
+    (val_add, ":top", 1),
+    (try_begin),
+        (le, ":nth", ":top"),
+        (try_for_range_backwards, ":i", ":nth", ":top"),
+            (neq,":i",0),
+            (party_get_slot,":j", "p_string_stack",  ":i"),
+            (str_store_party_name, s0, ":j"),
+            (remove_party, ":j"),
+            (party_get_slot,":size", "p_string_stack", 0),
+            (val_sub, ":size", 1),
+            (party_set_slot, "p_string_stack", 0, ":size"),
+        (try_end),
+    (try_end),""")
         file.write("]")
     with open("manuskrip_strings.py", "w") as file:
         file.write(PrintStringTables(stringTables))
@@ -750,7 +815,10 @@ class CalculateTree(Transformer):
                 else:
                     stringConcat = "\"{s"+ str(self.stringRegCounter)  +"}\""
                     stringTables.append((ConvertToStringID(stringConcat), stringConcat))
-                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  var[0] + "\", " + ConvertToStringID(stringConcat) +"),\n" 
+                    self.output += "\t"*self.blockLevel + "(call_script, \"script_push_string_stack\""+ ", " + ConvertToStringID(stringConcat) +"),\n"
+                    self.output += "\t"*self.blockLevel + "(val_add, \":stringCounter\""+ ", 1),\n"
+                    self.output += "\t"*self.blockLevel  + "(assign, \"" + var[0]  + "\", \":stringCounter\"),\n"
+                    #self.output +=  "\t"*self.blockLevel  +  "(assign, \"" +  var[0] + "\", " + ConvertToStringID(stringConcat) +"),\n" 
                     self.stringRegCounter = var[2]
                 self.lastAssignedVariable = var
                 self.lastAssignedValue = self.mathVars[-1]
@@ -764,12 +832,18 @@ class CalculateTree(Transformer):
                     self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +","+ ConvertToStringID(stringConcat) +" ),\n"
                     self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(variable[2])  + "),\n"
                     self.output +=  "\t"*self.blockLevel  +  "(str_store_string, s" + str(variable[2])  + ", " +  ConvertToStringID(str(arg2)) + "),\n"
-                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", " + ConvertToStringID(stringConcat)  + "),\n"
+                    self.output += "\t"*self.blockLevel + "(call_script, \"script_push_string_stack\""+ ", " + ConvertToStringID(stringConcat) +"),\n"
+                    self.output += "\t"*self.blockLevel + "(val_add, \":stringCounter\""+ ", 1),\n"            
+                    #self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", " + ConvertToStringID(stringConcat)  + "),\n"
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", \":stringCounter\"),\n"
                 else:
                     stringConcat = "\"{s"+ str(variable[2])  +"}\""
                     stringTables.append((ConvertToStringID(stringConcat), stringConcat))
                     self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(variable[2])  + "),\n"
-                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", " + ConvertToStringID(stringConcat)  + "),\n"
+                    self.output += "\t"*self.blockLevel + "(call_script, \"script_push_string_stack\""+ ", " + ConvertToStringID(stringConcat) +"),\n"
+                    self.output += "\t"*self.blockLevel + "(val_add, \":stringCounter\""+ ", 1),\n"            
+                    #self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", " + ConvertToStringID(stringConcat)  + "),\n"
+                    self.output +=  "\t"*self.blockLevel  +  "(assign, \"" + variable[0]  + "\", \":stringCounter\"),\n"
                 var = self.isValidVariable(arg1)
                 self.lastAssignedVariable = var 
                 self.lastAssignedValue = str(arg2)
@@ -1112,17 +1186,19 @@ class CalculateTree(Transformer):
                self.output += "\t"*self.blockLevel + "(assign, reg0, \""+  var[0] +"\"),\n"
                self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +","+ ConvertToStringID(stringConcat) + "),\n"
            elif(var[1] == "String"):
-               stringTables.append((ConvertToStringID(arg), arg))       
+               #
+               #stringTables.append((ConvertToStringID(arg), arg))       
                stringConcat = "\"{s"+  str(self.stringRegCounter) +"}{s63}\""
                stringTables.append((ConvertToStringID(stringConcat), stringConcat))
                #self.output +=  "\t"*self.blockLevel  +  "(str_clear, s" + str(self.stringRegCounter) + "),\n"
-               self.output += "\t"*self.blockLevel + "(str_store_string, s63"+ ", " + ConvertToStringID(arg) +"),\n"
+               self.output += "\t"*self.blockLevel + "(str_store_string, s63"+ ", s"+ str(var[2]) +"),\n"
                self.output += "\t"*self.blockLevel + "(str_store_string, s"+ str(self.stringRegCounter) +", " + ConvertToStringID(stringConcat) + " ),\n"
 
     def display_msg(self, arg):
         var = self.isValidVariable(arg)
         if(var and var[1] == "String"):
-            self.output += "\t"*self.blockLevel + "(display_message, \""+ str(var[0]) +"\" ),\n"
+            self.output += "\t"*self.blockLevel + "(call_script, \"script_get_string_stack\", \""+ str(var[0]) +"\" ),\n"
+            self.output += "\t"*self.blockLevel + "(display_message, s0),\n"
         else:
             raise Exception("Must string variable!")
 
@@ -1132,7 +1208,10 @@ class CalculateTree(Transformer):
     def procedure(self, *args):
         proc = self.WriteDocumentation()
         proc += "(\"" + self.currentProcedureName  + "\",[\n"
+        proc += "\t" + "(party_get_slot,\":prevStringStack\", \"p_string_stack\", 0),\n" 
+        proc += "\t" + "(assign,\":stringCounter\", 0),\n" 
         proc += self.output 
+        proc += "\t" + "(call_script, \"script_pop_to_nth_string_stack\", \":prevStringStack\"),\n"
         proc += "]),"
         procedures.append(proc)
         self.proceduresName[-1] = (self.currentProcedureName, self.paramsdeclares[:], [])
@@ -1142,7 +1221,10 @@ class CalculateTree(Transformer):
     def function(self, *args):
         proc = self.WriteDocumentation()
         proc += "(\"" + self.currentProcedureName  + "\",[\n"
+        proc += "\t" + "(party_get_slot,\":prevStringStack\", \"p_string_stack\", 0),\n" 
+        proc += "\t" + "(assign,\":stringCounter\", 0),\n"  
         proc += self.output 
+        proc += "\t" + "(call_script, \"script_pop_to_nth_string_stack\", \":prevStringStack\"),\n"
         proc += "]),"
         self.proceduresName[-1] = (self.currentProcedureName, self.paramsdeclares[:] ,self.returnTypes[:])
         procedures.append(proc)
@@ -1250,17 +1332,17 @@ exitprocedure: "die"
 ?procedurename: NAME -> procedure_name
 
 paramsdeclare : "("")"  
-				| "(" NAME ":" TYPE ")" 
-		        | "(" NAME ":" TYPE ("," NAME ":" TYPE)+ ")" 
+                | "(" NAME ":" TYPE ")" 
+                | "(" NAME ":" TYPE ("," NAME ":" TYPE)+ ")" 
 
 returnsdeclare  : "("")"
                 | "(" TYPE ")" 
-		        | "("  TYPE (","  TYPE)+ ")" 
+                | "("  TYPE (","  TYPE)+ ")" 
 
 
 mainblock :     "begin" "end"  
                 |"begin" NEWLINE*  "end"  
-				| "begin" (instruction)* "end" 
+                | "begin" (instruction)* "end" 
 
 beginblock: "then"
 endblock: "end"
@@ -1319,21 +1401,21 @@ display_msg: "DisplayMessage" "(" NAME  ")"
             | comp  "<=" sum -> op_le 
             | comp  ">" sum -> op_gt 
             | comp  "<" sum -> op_lt
-		    | comp  "!=" sum -> op_neq
+            | comp  "!=" sum -> op_neq
 
-		?sum: product
-			| sum "+" product -> op_add
-			| sum "-" product -> op_sub
+        ?sum: product
+            | sum "+" product -> op_add
+            | sum "-" product -> op_sub
             | sum  ".." atom -> string_concat
 
-		?product: atom
-			| product "*" atom -> op_mul
-			| product "/" atom -> op_div
+        ?product: atom
+            | product "*" atom -> op_mul
+            | product "/" atom -> op_div
             | product "%" atom -> op_mod
 
-		?atom: NUMBER         -> number
-			 | "-" atom       -> op_minus
-			 | "(" expression ")"
+        ?atom: NUMBER         -> number
+             | "-" atom       -> op_minus
+             | "(" expression ")"
              | "not" expression  -> op_neg             
              | function_expr 
              | indexing
@@ -1345,11 +1427,11 @@ display_msg: "DisplayMessage" "(" NAME  ")"
 
 
     ?function_retmultple_expr: variable params -> op_func_call_mult_return
-	?procedure_expr: variable params -> op_proc_call
+    ?procedure_expr: variable params -> op_proc_call
     ?function_expr: variable params -> op_func_call
-		?params:  "("")" 
-			| "(" (expression ) ")" 
-			| "(" (expression ) ("," (expression ))+ ")" 
+        ?params:  "("")" 
+            | "(" (expression ) ")" 
+            | "(" (expression ) ("," (expression ))+ ")" 
 
 return_expression: procedure_call_name | (NUMBER_NEG | NUMBER )
 
@@ -1384,7 +1466,7 @@ RAW_STRING: /"(.*?)"/
 TYPE: "Number" | "String" | "QString" | "Procedure" | "Function" | "Boolean"
     | "Faction" | "Presentation" | "Troop" | "Agent" | "Item" | "Array" | "DynamicArray"
 BOOL: "true"
-	| "false"
+    | "false"
 
 COMMENT     : "/*" /(.|\\n|\\r)+/ "*/"  
              |  "//" /(.)+(\\n|\\r)/ 
@@ -1412,25 +1494,27 @@ def test():
        begin
             output: String;
             output2: String;
-            output = "test" .. output;
-            output = output .. "xyx" .. output2 .. "123";
+            //output = "test" .. output;
+            //output = output .. "xyx" .. output2 .. "123";
 
-            output2 = "Hello world";
+            output = "Hello world";
             DisplayMessage(output2);
             i : Number;
             for i = 0 to input do
                 if(i % 3 == 0) then
                     output = "Fizz";
                 end
-                if( i % 5 == 0) then
-                    output = output .. "Buzz";
-                end
+               if( i % 5 == 0) then
+                   output = output .. "Buzz";
+               end
                 if (i % 3 != 0 and i % 5 != 0) then
                     output = "Nr. " .. ToString(i) .. " number test  ";
                 end
                 DisplayMessage(output);
                 output = "";
-            end
+             end
+             output = "Function Exiting";
+            DisplayMessage(output);
        end
        procedure GanjilGenap(input : Number)
        begin

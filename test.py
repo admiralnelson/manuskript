@@ -262,7 +262,8 @@ manuskript = [
             (val_sub, ":size", 1),
             (party_set_slot, "p_string_stack", 0, ":size"),
         (try_end),
-    (try_end),""")
+    (try_end)
+])""")
         file.write("]")
     with open("manuskrip_strings.py", "w") as file:
         file.write(PrintStringTables(stringTables))
